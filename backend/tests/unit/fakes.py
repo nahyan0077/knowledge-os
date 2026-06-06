@@ -319,7 +319,23 @@ class ConversationRepo:
         )[:limit]
 
     async def add_message(self, message: Message) -> None:
+        if message.sequence_number <= 0:
+            max_seq = max(
+                [
+                    msg.sequence_number
+                    for msg in self.store.messages
+                    if msg.conversation_id == message.conversation_id
+                ],
+                default=0,
+            )
+            message.sequence_number = max_seq + 1
         self.store.messages.append(message)
+
+    async def save_message(self, message: Message) -> None:
+        for idx, msg in enumerate(self.store.messages):
+            if msg.id == message.id:
+                self.store.messages[idx] = message
+                break
 
     async def list_messages(self, conversation_id: UUID, user_id: UUID) -> Sequence[Message]:
         import copy
@@ -339,7 +355,7 @@ class ConversationRepo:
                 for msg in self.store.messages
                 if msg.conversation_id == conversation_id
             ],
-            key=lambda x: x.created_at,
+            key=lambda x: x.sequence_number,
         )
 
 

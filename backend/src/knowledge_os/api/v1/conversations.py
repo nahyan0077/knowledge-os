@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
@@ -194,7 +195,7 @@ async def chat_stream(
                 elif isinstance(item, str):
                     yield {
                         "event": "chunk",
-                        "data": item,
+                        "data": json.dumps({"content": item}),
                     }
         except Exception as err:
             yield {

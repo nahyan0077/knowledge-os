@@ -25,6 +25,7 @@ from knowledge_os.domain.entities import (
     DocumentVersionStatus,
     MembershipRole,
     MessageRole,
+    MessageStatus,
     OrganizationType,
     UserStatus,
 )
@@ -294,11 +295,26 @@ class MessageModel(Base):
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+    status: Mapped[MessageStatus] = mapped_column(
+        Enum(
+            MessageStatus,
+            name="message_status",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        nullable=False,
+        default=MessageStatus.COMPLETE,
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (Index("ix_messages_conversation_id", "conversation_id"),)
+    __table_args__ = (
+        Index("ix_messages_conversation_id", "conversation_id"),
+        UniqueConstraint(
+            "conversation_id", "sequence_number", name="uq_conversation_message_sequence"
+        ),
+    )
 
 
 class LlmUsageModel(Base):

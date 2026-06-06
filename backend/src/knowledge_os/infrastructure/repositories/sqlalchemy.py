@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -528,6 +528,8 @@ def to_message(row: MessageModel) -> Message:
         role=row.role,
         content=row.content,
         metadata=row.meta,
+        status=row.status,
+        sequence_number=row.sequence_number,
         created_at=row.created_at,
     )
 
@@ -599,6 +601,14 @@ class SqlAlchemyConversationRepository:
         return [to_conversation(row) for row in rows]
 
     async def add_message(self, message: Message) -> None:
+        if message.sequence_number <= 0:
+            stmt = select(func.max(MessageModel.sequence_number)).where(
+                MessageModel.conversation_id == message.conversation_id
+            )
+            max_seq = await self.session.scalar(stmt)
+            next_seq = (max_seq or 0) + 1
+            message.sequence_number = next_seq
+
         self.session.add(
             MessageModel(
                 id=message.id,
@@ -606,7 +616,21 @@ class SqlAlchemyConversationRepository:
                 role=message.role,
                 content=message.content,
                 meta=message.metadata,
+                status=message.status,
+                sequence_number=message.sequence_number,
                 created_at=message.created_at,
+            )
+        )
+
+    async def save_message(self, message: Message) -> None:
+        await self.session.execute(
+            update(MessageModel)
+            .where(MessageModel.id == message.id)
+            .values(
+                content=message.content,
+                meta=message.metadata,
+                status=message.status,
+                sequence_number=message.sequence_number,
             )
         )
 
@@ -624,7 +648,7 @@ class SqlAlchemyConversationRepository:
                     ProjectMemberModel.user_id == user_id,
                     ConversationModel.deleted_at.is_(None),
                 )
-                .order_by(MessageModel.created_at.asc())
+                .order_by(MessageModel.sequence_number.asc())
             )
         ).all()
         return [to_message(row) for row in rows]

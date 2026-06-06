@@ -83,3 +83,13 @@ class ChatAgentPort(Protocol):
         messages: list[tuple[str, str]],
         config: LlmModelConfig,
     ) -> AsyncIterator[LlmResponseChunk | LlmUsageMetrics]: ...
+
+
+class PricingService(Protocol):
+    def calculate_cost(
+        self,
+        provider: str,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+    ) -> float: ...

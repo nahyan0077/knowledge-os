@@ -53,10 +53,14 @@ def get_document_service(
     return DocumentService(uow_factory=get_uow, storage=storage)
 
 
-def get_conversation_service() -> ConversationService:
+def get_conversation_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ConversationService:
     from knowledge_os.infrastructure.ai.pydantic_ai_adapter import PydanticAiAdapter
+    from knowledge_os.infrastructure.services.pricing import ConfigPricingService
 
-    return ConversationService(uow_factory=get_uow, chat_agent=PydanticAiAdapter())
+    pricing_service = ConfigPricingService(pricing_dict=settings.model_pricing)
+    return ConversationService(uow_factory=get_uow, chat_agent=PydanticAiAdapter(pricing_service))
 
 
 def get_access_token_service(

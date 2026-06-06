@@ -213,6 +213,8 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     metadata: dict[str, Any]
+    status: str
+    sequence_number: int
     created_at: datetime
 
     @classmethod
@@ -223,6 +225,8 @@ class MessageResponse(BaseModel):
             role=msg.role.value,
             content=msg.content,
             metadata=msg.metadata,
+            status=msg.status.value,
+            sequence_number=msg.sequence_number,
             created_at=msg.created_at,
         )
 

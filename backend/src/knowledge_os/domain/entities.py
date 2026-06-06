@@ -145,6 +145,13 @@ class MessageRole(StrEnum):
     SYSTEM = "system"
 
 
+class MessageStatus(StrEnum):
+    STREAMING = "streaming"
+    COMPLETE = "complete"
+    INTERRUPTED = "interrupted"
+    FAILED = "failed"
+
+
 @dataclass(slots=True)
 class Conversation:
     organization_id: UUID
@@ -163,6 +170,8 @@ class Message:
     role: MessageRole
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
+    status: MessageStatus = MessageStatus.COMPLETE
+    sequence_number: int = 0
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
 

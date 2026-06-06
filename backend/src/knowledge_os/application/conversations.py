@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any
 from uuid import UUID
@@ -19,6 +20,7 @@ from knowledge_os.domain.entities import (
     MembershipRole,
     Message,
     MessageRole,
+    MessageStatus,
     utc_now,
 )
 from knowledge_os.domain.repositories import UnitOfWork
@@ -197,8 +199,19 @@ class ConversationService:
                 conversation_id=conversation_id,
                 role=MessageRole.USER,
                 content=content.strip(),
+                status=MessageStatus.COMPLETE,
             )
             await uow.conversations.add_message(user_msg)
+
+            # Start assistant message in STREAMING status initially
+            assistant_msg = Message(
+                conversation_id=conversation_id,
+                role=MessageRole.ASSISTANT,
+                content="",
+                status=MessageStatus.STREAMING,
+            )
+            await uow.conversations.add_message(assistant_msg)
+
             conversation.updated_at = utc_now()
             await uow.conversations.save(conversation)
             await uow.commit()
@@ -206,29 +219,42 @@ class ConversationService:
         async with self._uow_factory() as uow:
             history = await uow.conversations.list_messages(conversation_id, user_id)
 
-        messages_tuples = [(msg.role.value, msg.content) for msg in history]
+        # Exclude empty streaming assistant message from history
+        messages_tuples = [
+            (msg.role.value, msg.content) for msg in history if msg.id != assistant_msg.id
+        ]
 
         system_prompt = "You are a helpful assistant."
         assert self._chat_agent is not None
-        response = await self._chat_agent.generate(system_prompt, messages_tuples, config)
+
+        try:
+            response = await self._chat_agent.generate(system_prompt, messages_tuples, config)
+            status = MessageStatus.COMPLETE
+            content_out = response.content
+            metrics = response.usage
+        except Exception:
+            async with self._uow_factory() as uow:
+                assistant_msg.content = ""
+                assistant_msg.status = MessageStatus.FAILED
+                await uow.conversations.save_message(assistant_msg)
+                await uow.commit()
+            raise
 
         async with self._uow_factory() as uow:
-            assistant_msg = Message(
-                conversation_id=conversation_id,
-                role=MessageRole.ASSISTANT,
-                content=response.content,
-            )
+            assistant_msg.content = content_out
+            assistant_msg.status = status
+
             usage = LlmUsage(
                 organization_id=conversation.organization_id,
                 conversation_id=conversation_id,
                 message_id=assistant_msg.id,
-                provider=response.usage.provider,
-                model=response.usage.model,
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens,
-                total_tokens=response.usage.total_tokens,
-                latency_ms=response.usage.latency_ms,
-                cost=response.usage.cost,
+                provider=metrics.provider,
+                model=metrics.model,
+                input_tokens=metrics.input_tokens,
+                output_tokens=metrics.output_tokens,
+                total_tokens=metrics.total_tokens,
+                latency_ms=metrics.latency_ms,
+                cost=metrics.cost,
             )
 
             conversation = await uow.conversations.get_by_id(conversation_id, user_id)
@@ -236,7 +262,7 @@ class ConversationService:
                 conversation.updated_at = utc_now()
                 await uow.conversations.save(conversation)
 
-            await uow.conversations.add_message(assistant_msg)
+            await uow.conversations.save_message(assistant_msg)
             await uow.llm_usage.add(usage)
             await uow.commit()
 
@@ -265,73 +291,102 @@ class ConversationService:
                 conversation_id=conversation_id,
                 role=MessageRole.USER,
                 content=content.strip(),
+                status=MessageStatus.COMPLETE,
             )
             await uow.conversations.add_message(user_msg)
+
+            # Start assistant message in STREAMING status initially
+            assistant_msg = Message(
+                conversation_id=conversation_id,
+                role=MessageRole.ASSISTANT,
+                content="",
+                status=MessageStatus.STREAMING,
+            )
+            await uow.conversations.add_message(assistant_msg)
+
             conversation.updated_at = utc_now()
             await uow.conversations.save(conversation)
             await uow.commit()
 
         yield user_msg
+        yield assistant_msg
 
         async with self._uow_factory() as uow:
             history = await uow.conversations.list_messages(conversation_id, user_id)
 
-        messages_tuples = [(msg.role.value, msg.content) for msg in history]
+        # Exclude empty streaming assistant message from history
+        messages_tuples = [
+            (msg.role.value, msg.content) for msg in history if msg.id != assistant_msg.id
+        ]
 
         system_prompt = "You are a helpful assistant."
         assert self._chat_agent is not None
 
         full_content = ""
         metrics = None
+        status = MessageStatus.COMPLETE
 
-        async for item in self._chat_agent.generate_stream(system_prompt, messages_tuples, config):
-            if isinstance(item, LlmResponseChunk):
-                full_content += item.content
-                yield item.content
-            elif isinstance(item, LlmUsageMetrics):
-                metrics = item
+        try:
+            async for item in self._chat_agent.generate_stream(
+                system_prompt, messages_tuples, config
+            ):
+                if isinstance(item, LlmResponseChunk):
+                    full_content += item.content
+                    yield item.content
+                elif isinstance(item, LlmUsageMetrics):
+                    metrics = item
+        except asyncio.CancelledError:
+            status = MessageStatus.INTERRUPTED
+            raise
+        except Exception:
+            status = MessageStatus.FAILED
+            raise
+        finally:
 
-        if metrics is None:
-            metrics = LlmUsageMetrics(
-                provider=config.provider,
-                model=config.model_name,
-                input_tokens=0,
-                output_tokens=0,
-                total_tokens=0,
-                latency_ms=0,
-                cost=0.0,
-            )
+            async def persist_final_state() -> LlmUsage:
+                nonlocal metrics
+                if metrics is None:
+                    metrics = LlmUsageMetrics(
+                        provider=config.provider,
+                        model=config.model_name,
+                        input_tokens=0,
+                        output_tokens=0,
+                        total_tokens=0,
+                        latency_ms=0,
+                        cost=0.0,
+                    )
 
-        async with self._uow_factory() as uow:
-            assistant_msg = Message(
-                conversation_id=conversation_id,
-                role=MessageRole.ASSISTANT,
-                content=full_content,
-            )
-            usage = LlmUsage(
-                organization_id=conversation.organization_id,
-                conversation_id=conversation_id,
-                message_id=assistant_msg.id,
-                provider=metrics.provider,
-                model=metrics.model,
-                input_tokens=metrics.input_tokens,
-                output_tokens=metrics.output_tokens,
-                total_tokens=metrics.total_tokens,
-                latency_ms=metrics.latency_ms,
-                cost=metrics.cost,
-            )
+                async with self._uow_factory() as uow:
+                    assistant_msg.content = full_content
+                    assistant_msg.status = status
+                    await uow.conversations.save_message(assistant_msg)
 
-            conversation = await uow.conversations.get_by_id(conversation_id, user_id)
-            if conversation:
-                conversation.updated_at = utc_now()
-                await uow.conversations.save(conversation)
+                    usage = LlmUsage(
+                        organization_id=conversation.organization_id,
+                        conversation_id=conversation_id,
+                        message_id=assistant_msg.id,
+                        provider=metrics.provider,
+                        model=metrics.model,
+                        input_tokens=metrics.input_tokens,
+                        output_tokens=metrics.output_tokens,
+                        total_tokens=metrics.total_tokens,
+                        latency_ms=metrics.latency_ms,
+                        cost=metrics.cost,
+                    )
+                    await uow.llm_usage.add(usage)
 
-            await uow.conversations.add_message(assistant_msg)
-            await uow.llm_usage.add(usage)
-            await uow.commit()
+                    conv = await uow.conversations.get_by_id(conversation_id, user_id)
+                    if conv:
+                        conv.updated_at = utc_now()
+                        await uow.conversations.save(conv)
 
-        yield assistant_msg
-        yield usage
+                    await uow.commit()
+                    return usage
+
+            usage_record = await asyncio.shield(persist_final_state())
+            if status == MessageStatus.COMPLETE:
+                yield assistant_msg
+                yield usage_record
 
     @staticmethod
     def _validate_title(title: str) -> str:

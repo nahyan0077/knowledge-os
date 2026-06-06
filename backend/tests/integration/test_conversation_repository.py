@@ -10,6 +10,7 @@ from knowledge_os.domain.entities import (
     MembershipRole,
     Message,
     MessageRole,
+    MessageStatus,
     OrganizationType,
 )
 from knowledge_os.infrastructure.database.models import (
@@ -139,8 +140,12 @@ async def test_sqlalchemy_conversation_lifecycle(db_session) -> None:
     assert messages[0].role == MessageRole.USER
     assert messages[0].content == "What is RAG?"
     assert messages[0].metadata == {"client": "cli"}
+    assert messages[0].sequence_number == 1
+    assert messages[0].status == MessageStatus.COMPLETE
     assert messages[1].role == MessageRole.ASSISTANT
     assert messages[1].content == "Retrieval-Augmented Generation."
+    assert messages[1].sequence_number == 2
+    assert messages[1].status == MessageStatus.COMPLETE
 
     # 5. Rename Conversation
     conv.title = "Renamed Chat"

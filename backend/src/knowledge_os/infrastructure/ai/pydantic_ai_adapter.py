@@ -15,6 +15,7 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.gemini import GeminiModel
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.settings import ModelSettings
 
 from knowledge_os.application.ports import (
     ChatAgentPort,
@@ -22,6 +23,7 @@ from knowledge_os.application.ports import (
     LlmResponse,
     LlmResponseChunk,
     LlmUsageMetrics,
+    PricingService,
 )
 
 
@@ -39,30 +41,10 @@ def _get_model(config: LlmModelConfig) -> Model:
         raise ValueError(f"Unsupported provider: {config.provider}")
 
 
-def _calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    model_lower = model.lower()
-    if "gpt-4o-mini" in model_lower:
-        input_rate = 0.150 / 1_000_000
-        output_rate = 0.600 / 1_000_000
-    elif "gpt-4o" in model_lower:
-        input_rate = 5.00 / 1_000_000
-        output_rate = 15.00 / 1_000_000
-    elif "claude-3-5-sonnet" in model_lower:
-        input_rate = 3.00 / 1_000_000
-        output_rate = 15.00 / 1_000_000
-    elif "gemini-1.5-pro" in model_lower:
-        input_rate = 1.25 / 1_000_000
-        output_rate = 5.00 / 1_000_000
-    elif "gemini-1.5-flash" in model_lower:
-        input_rate = 0.075 / 1_000_000
-        output_rate = 0.30 / 1_000_000
-    else:
-        input_rate = 0.150 / 1_000_000
-        output_rate = 0.600 / 1_000_000
-    return input_tokens * input_rate + output_tokens * output_rate
-
-
 class PydanticAiAdapter(ChatAgentPort):
+    def __init__(self, pricing_service: PricingService) -> None:
+        self._pricing_service = pricing_service
+
     async def generate(
         self,
         system_prompt: str,
@@ -92,15 +74,23 @@ class PydanticAiAdapter(ChatAgentPort):
             elif r_lower == "system":
                 ai_history.append(ModelRequest(parts=[SystemPromptPart(content=c)]))
 
+        model_settings = None
+        if config.temperature is not None:
+            model_settings = ModelSettings(temperature=config.temperature)
+
         start_time = time.perf_counter()
-        result = await agent.run(user_prompt, message_history=ai_history)
+        result = await agent.run(
+            user_prompt, message_history=ai_history, model_settings=model_settings
+        )
         latency_ms = int((time.perf_counter() - start_time) * 1000)
 
         usage = result.usage() if callable(result.usage) else result.usage
         input_tokens = usage.input_tokens or 0
         output_tokens = usage.output_tokens or 0
         total_tokens = input_tokens + output_tokens
-        cost = _calculate_cost(config.model_name, input_tokens, output_tokens)
+        cost = self._pricing_service.calculate_cost(
+            config.provider, config.model_name, input_tokens, output_tokens
+        )
 
         metrics = LlmUsageMetrics(
             provider=config.provider,
@@ -143,8 +133,14 @@ class PydanticAiAdapter(ChatAgentPort):
             elif r_lower == "system":
                 ai_history.append(ModelRequest(parts=[SystemPromptPart(content=c)]))
 
+        model_settings = None
+        if config.temperature is not None:
+            model_settings = ModelSettings(temperature=config.temperature)
+
         start_time = time.perf_counter()
-        async with agent.run_stream(user_prompt, message_history=ai_history) as result:
+        async with agent.run_stream(
+            user_prompt, message_history=ai_history, model_settings=model_settings
+        ) as result:
             async for chunk in result.stream_text(delta=True):
                 yield LlmResponseChunk(content=chunk)
 
@@ -153,7 +149,9 @@ class PydanticAiAdapter(ChatAgentPort):
         input_tokens = usage.input_tokens or 0
         output_tokens = usage.output_tokens or 0
         total_tokens = input_tokens + output_tokens
-        cost = _calculate_cost(config.model_name, input_tokens, output_tokens)
+        cost = self._pricing_service.calculate_cost(
+            config.provider, config.model_name, input_tokens, output_tokens
+        )
 
         yield LlmUsageMetrics(
             provider=config.provider,

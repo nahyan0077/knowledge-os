@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     secure_cookies: bool = False
     azure_storage_connection_string: str | None = None
     azure_storage_container_name: str = "documents"
+    model_pricing: dict[str, dict[str, float]] = {
+        "gpt-4o-mini": {"input_rate_per_million": 0.150, "output_rate_per_million": 0.600},
+        "gpt-4o": {"input_rate_per_million": 5.00, "output_rate_per_million": 15.00},
+        "claude-3-5-sonnet": {"input_rate_per_million": 3.00, "output_rate_per_million": 15.00},
+        "gemini-1.5-pro": {"input_rate_per_million": 1.25, "output_rate_per_million": 5.00},
+        "gemini-1.5-flash": {"input_rate_per_million": 0.075, "output_rate_per_million": 0.30},
+        "default": {"input_rate_per_million": 0.150, "output_rate_per_million": 0.600},
+    }
 
 
 @lru_cache
