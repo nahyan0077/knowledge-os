@@ -47,9 +47,23 @@
 - **Integration Tests**: Extended testcontainers PostgreSQL coverage to verify sequence calculation, constraints, and status persistence. Added unit tests in `test_conversation_service.py` to cover stream disconnections and provider failures.
 - **Quality Gates**: All Ruff styling, strict mypy type safety, and 40 pytest tests passing successfully.
 
+### Sprint 4.5 (Production-Grade Frontend Foundation) - Completed
+- **Authentication**: Fully functional Login/Register UI matching JWT bearer authorization, secure cookie-based automatic token refreshing, protected route checking, and local state persistence.
+- **Project Dashboard**: Dynamic list of all projects within the tenant, modal for project initialization, and routing layouts.
+- **Collapsible Sidebar Layout**: Collapse-ready project navigation sidebar linking to Documents, Chats, and Settings with active path matching.
+- **Document Explorer**: Drag-and-drop document dropzone, logical document tables with delete triggers, slide-out document history drawer displaying version entries, and version additions.
+- **Conversation Explorer**: Sidebar containing conversation list with active message state bindings, renaming forms, creation triggers, and soft-deletes.
+- **Chat Workspace**: Conversation thread containing user prompts and agent responses. Supports:
+  - Real-time POST Server-Sent Events (SSE) streaming parsed via browser fetch reader.
+  - Active message status indicators (`STREAMING` with animations, `COMPLETE`, `INTERRUPTED`, and `FAILED` with retry actions).
+  - Provider model config selector (OpenAI, Gemini, Anthropic, TestModel) and temperature parameters.
+  - Dynamic scroll-to-bottom locks and generation cancellation (aborts stream via AbortController).
+- **Project Settings**: General settings panel supporting project title/description updates and complete project workspace deletion.
+- **Quality Gates**: Production Turbopack compilation passing with zero TypeScript or ESLint errors.
+
 ## Technical Debt & Risks
 - **Blob Storage Cleanup**: Soft-deleting a document currently retains files in Azure Blob Storage. Hard delete logic or automated cleanup workflows are planned for later phases.
 - **Docker Dependency**: Integration tests require Docker daemon to run.
 
 ## Next Steps
-- Implement Sprint 5 (Retrieval & Grounding / Qdrant & Embeddings).
+- Implement Sprint 5 (Retrieval & Grounding / Qdrant & Embeddings / RAG integration).

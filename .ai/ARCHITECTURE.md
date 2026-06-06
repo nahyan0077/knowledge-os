@@ -16,15 +16,15 @@ Core rules:
 
 ```mermaid
 flowchart LR
-    User --> Web[Next.js Web - Planned]
+    User --> Web[Next.js Web]
     Web --> API[FastAPI API]
     API --> PG[(PostgreSQL)]
     API --> Temporal[Temporal - Planned]
     Temporal --> Workers[Workers - Planned]
     Workers --> PG
-    Workers --> Blob[Azure Blob - Planned]
+    Workers --> Blob[Azure Blob]
     Workers --> Qdrant[Qdrant - Planned]
-    API --> AI[PydanticAI Gateway - Planned]
+    API --> AI[PydanticAI Gateway]
     Workers --> AI
     AI --> OpenAI
     AI --> Gemini
@@ -43,7 +43,7 @@ flowchart TD
     DI --> Adapters
 ```
 
-Implemented backend paths:
+## Folder Structure
 
 ```text
 backend/src/knowledge_os/
@@ -51,20 +51,25 @@ backend/src/knowledge_os/
   application/      Use-case orchestration and ports
   domain/           Entities, errors, repository contracts
   infrastructure/   SQLAlchemy, security, and database adapters
+
+frontend/src/
+  app/              Next.js pages, routing layouts, and providers
+  features/         Domain features (auth, projects, documents, conversations, chat)
+  shared/           Re-usable layers (api, lib, types, hooks, ui)
 ```
 
 ## Runtime Architecture
 
 | Runtime | Responsibility | Status |
 |---|---|---|
-| FastAPI API | Synchronous commands/queries, auth, streaming entry point | Implemented partially |
-| Next.js web | User interface and browser state | Planned |
+| FastAPI API | Synchronous commands/queries, auth, streaming entry point | Implemented |
+| Next.js web | User interface and browser state | Implemented |
 | Temporal ingestion worker | Document extraction, chunking, embeddings, indexing | Planned |
 | Temporal agent worker | Agent and report execution | Planned |
-| PostgreSQL | Business truth and product-facing projections | Implemented partially |
+| PostgreSQL | Business truth and product-facing projections | Implemented |
 | Qdrant | Derived vector index | Planned |
-| Azure Blob | Immutable binaries and generated artifacts | Planned |
-| PydanticAI gateway | Provider-neutral model and agent execution | Planned |
+| Azure Blob | Immutable binaries and generated storage provider | Implemented |
+| PydanticAI gateway | Provider-neutral model and agent execution | Implemented |
 
 ## Deployment Architecture
 

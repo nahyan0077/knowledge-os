@@ -163,6 +163,13 @@ class DocumentService:
                 raise NotFoundError("Document not found", "document_not_found")
             return document
 
+    async def list_versions(self, document_id: UUID, user_id: UUID) -> Sequence[DocumentVersion]:
+        async with self._uow_factory() as uow:
+            document = await uow.documents.get_by_id(document_id, user_id)
+            if document is None:
+                raise NotFoundError("Document not found", "document_not_found")
+            return await uow.documents.list_versions(document_id, user_id)
+
     async def delete(self, document_id: UUID, user_id: UUID) -> None:
         async with self._uow_factory() as uow:
             document = await uow.documents.get_by_id(document_id, user_id)

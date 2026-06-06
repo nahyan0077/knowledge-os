@@ -97,3 +97,13 @@ async def delete_document(
 ) -> Response:
     await service.delete(document_id, user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/documents/{document_id}/versions", response_model=list[DocumentVersionResponse])
+async def list_document_versions(
+    document_id: UUID,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[DocumentService, Depends(get_document_service)],
+) -> list[DocumentVersionResponse]:
+    versions = await service.list_versions(document_id, user_id)
+    return [DocumentVersionResponse.from_domain(v) for v in versions]
