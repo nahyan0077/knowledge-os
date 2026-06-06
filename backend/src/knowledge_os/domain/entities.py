@@ -165,3 +165,19 @@ class Message:
     metadata: dict[str, Any] = field(default_factory=dict)
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(slots=True)
+class LlmUsage:
+    organization_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    latency_ms: int
+    cost: float
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)

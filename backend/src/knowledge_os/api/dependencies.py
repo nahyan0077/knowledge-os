@@ -54,7 +54,9 @@ def get_document_service(
 
 
 def get_conversation_service() -> ConversationService:
-    return ConversationService(uow_factory=get_uow)
+    from knowledge_os.infrastructure.ai.pydantic_ai_adapter import PydanticAiAdapter
+
+    return ConversationService(uow_factory=get_uow, chat_agent=PydanticAiAdapter())
 
 
 def get_access_token_service(

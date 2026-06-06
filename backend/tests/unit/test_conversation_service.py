@@ -3,9 +3,12 @@ from uuid import uuid4
 import pytest
 
 from knowledge_os.application.conversations import ConversationService
+from knowledge_os.application.ports import LlmModelConfig
 from knowledge_os.domain.common import AuthorizationError, NotFoundError, ValidationError
 from knowledge_os.domain.entities import (
+    LlmUsage,
     MembershipRole,
+    Message,
     MessageRole,
     Organization,
     OrganizationMembership,
@@ -14,7 +17,7 @@ from knowledge_os.domain.entities import (
     ProjectMembership,
     User,
 )
-from tests.unit.fakes import FakeUnitOfWork, Store
+from tests.unit.fakes import FakeChatAgent, FakeUnitOfWork, Store
 
 
 def setup_store() -> tuple[Store, User, Organization, Project]:
@@ -208,3 +211,102 @@ async def test_list_messages_success() -> None:
     assert len(messages) == 2
     assert messages[0].content == "message 1"
     assert messages[1].content == "message 2"
+
+
+@pytest.mark.asyncio
+async def test_send_message_success() -> None:
+    store, user, org, project = setup_store()
+    agent = FakeChatAgent(response_content="Hello human")
+    service = ConversationService(lambda: FakeUnitOfWork(store), agent)
+
+    conv = await service.create(org.id, project.id, user.id, "Chat")
+    config = LlmModelConfig(provider="test", model_name="test-model")
+
+    user_msg, assistant_msg, usage = await service.send_message(
+        conversation_id=conv.id,
+        user_id=user.id,
+        content="Hello bot",
+        config=config,
+    )
+
+    # Verify return values
+    assert user_msg.content == "Hello bot"
+    assert user_msg.role == MessageRole.USER
+    assert assistant_msg.content == "Hello human"
+    assert assistant_msg.role == MessageRole.ASSISTANT
+    assert usage.cost == 0.0005
+    assert usage.input_tokens == 10
+
+    # Verify store persistence
+    assert len(store.messages) == 2
+    assert store.messages[0].content == "Hello bot"
+    assert store.messages[1].content == "Hello human"
+    assert usage.id in store.llm_usage
+
+    # Verify agent was called with correct context (history)
+    assert len(agent.calls) == 1
+    sys_prompt, history, cfg = agent.calls[0]
+    assert sys_prompt == "You are a helpful assistant."
+    assert len(history) == 1
+    assert history[0] == ("user", "Hello bot")
+    assert cfg == config
+
+
+@pytest.mark.asyncio
+async def test_send_message_empty_content() -> None:
+    store, user, org, project = setup_store()
+    agent = FakeChatAgent()
+    service = ConversationService(lambda: FakeUnitOfWork(store), agent)
+    conv = await service.create(org.id, project.id, user.id, "Chat")
+    config = LlmModelConfig(provider="test", model_name="test-model")
+
+    with pytest.raises(ValidationError):
+        await service.send_message(conv.id, user.id, "   ", config)
+
+
+@pytest.mark.asyncio
+async def test_send_message_stream_success() -> None:
+    store, user, org, project = setup_store()
+    agent = FakeChatAgent(response_content="Hello human world")
+    service = ConversationService(lambda: FakeUnitOfWork(store), agent)
+
+    conv = await service.create(org.id, project.id, user.id, "Chat")
+    config = LlmModelConfig(provider="test", model_name="test-model")
+
+    items = []
+    async for item in service.send_message_stream(
+        conversation_id=conv.id,
+        user_id=user.id,
+        content="Hello stream",
+        config=config,
+    ):
+        items.append(item)
+
+    # Expected sequence:
+    # 1. Message (user)
+    # 2. str ("Hello ")
+    # 3. str ("human ")
+    # 4. str ("world ")
+    # 5. Message (assistant)
+    # 6. LlmUsage (usage)
+    assert len(items) == 6
+    assert isinstance(items[0], Message)
+    assert items[0].role == MessageRole.USER
+    assert items[0].content == "Hello stream"
+
+    assert items[1] == "Hello "
+    assert items[2] == "human "
+    assert items[3] == "world "
+
+    assert isinstance(items[4], Message)
+    assert items[4].role == MessageRole.ASSISTANT
+    assert items[4].content == "Hello human world "
+
+    assert isinstance(items[5], LlmUsage)
+    assert items[5].cost == 0.0005
+
+    # Verify store persistence
+    assert len(store.messages) == 2
+    assert store.messages[0].content == "Hello stream"
+    assert store.messages[1].content == "Hello human world "
+    assert items[5].id in store.llm_usage

@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
@@ -37,3 +38,48 @@ class BlobStoragePort(Protocol):
     async def delete(self, blob_path: str) -> None:
         """Deletes file data from storage."""
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class LlmModelConfig:
+    provider: str
+    model_name: str
+    temperature: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LlmResponseChunk:
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
+class LlmUsageMetrics:
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    latency_ms: int
+    cost: float
+
+
+@dataclass(frozen=True, slots=True)
+class LlmResponse:
+    content: str
+    usage: LlmUsageMetrics
+
+
+class ChatAgentPort(Protocol):
+    async def generate(
+        self,
+        system_prompt: str,
+        messages: list[tuple[str, str]],  # List of (role, content)
+        config: LlmModelConfig,
+    ) -> LlmResponse: ...
+
+    def generate_stream(
+        self,
+        system_prompt: str,
+        messages: list[tuple[str, str]],
+        config: LlmModelConfig,
+    ) -> AsyncIterator[LlmResponseChunk | LlmUsageMetrics]: ...

@@ -1,7 +1,13 @@
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any
 from uuid import UUID
 
+from knowledge_os.application.ports import (
+    ChatAgentPort,
+    LlmModelConfig,
+    LlmResponseChunk,
+    LlmUsageMetrics,
+)
 from knowledge_os.domain.common import (
     AuthorizationError,
     NotFoundError,
@@ -9,6 +15,7 @@ from knowledge_os.domain.common import (
 )
 from knowledge_os.domain.entities import (
     Conversation,
+    LlmUsage,
     MembershipRole,
     Message,
     MessageRole,
@@ -18,8 +25,13 @@ from knowledge_os.domain.repositories import UnitOfWork
 
 
 class ConversationService:
-    def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
+    def __init__(
+        self,
+        uow_factory: Callable[[], UnitOfWork],
+        chat_agent: ChatAgentPort | None = None,
+    ) -> None:
         self._uow_factory = uow_factory
+        self._chat_agent = chat_agent
 
     async def create(
         self,
@@ -161,6 +173,165 @@ class ConversationService:
                 raise NotFoundError("Conversation not found", "conversation_not_found")
 
             return await uow.conversations.list_messages(conversation_id, user_id)
+
+    async def send_message(
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        content: str,
+        config: LlmModelConfig,
+    ) -> tuple[Message, Message, LlmUsage]:
+        if not content.strip():
+            raise ValidationError("Message content cannot be empty", "empty_content")
+
+        async with self._uow_factory() as uow:
+            conversation = await uow.conversations.get_by_id(conversation_id, user_id)
+            if conversation is None:
+                raise NotFoundError("Conversation not found", "conversation_not_found")
+
+            project_role = await uow.projects.user_role(conversation.project_id, user_id)
+            if project_role not in {MembershipRole.OWNER, MembershipRole.EDITOR}:
+                raise AuthorizationError("Write access denied", "project_write_denied")
+
+            user_msg = Message(
+                conversation_id=conversation_id,
+                role=MessageRole.USER,
+                content=content.strip(),
+            )
+            await uow.conversations.add_message(user_msg)
+            conversation.updated_at = utc_now()
+            await uow.conversations.save(conversation)
+            await uow.commit()
+
+        async with self._uow_factory() as uow:
+            history = await uow.conversations.list_messages(conversation_id, user_id)
+
+        messages_tuples = [(msg.role.value, msg.content) for msg in history]
+
+        system_prompt = "You are a helpful assistant."
+        assert self._chat_agent is not None
+        response = await self._chat_agent.generate(system_prompt, messages_tuples, config)
+
+        async with self._uow_factory() as uow:
+            assistant_msg = Message(
+                conversation_id=conversation_id,
+                role=MessageRole.ASSISTANT,
+                content=response.content,
+            )
+            usage = LlmUsage(
+                organization_id=conversation.organization_id,
+                conversation_id=conversation_id,
+                message_id=assistant_msg.id,
+                provider=response.usage.provider,
+                model=response.usage.model,
+                input_tokens=response.usage.input_tokens,
+                output_tokens=response.usage.output_tokens,
+                total_tokens=response.usage.total_tokens,
+                latency_ms=response.usage.latency_ms,
+                cost=response.usage.cost,
+            )
+
+            conversation = await uow.conversations.get_by_id(conversation_id, user_id)
+            if conversation:
+                conversation.updated_at = utc_now()
+                await uow.conversations.save(conversation)
+
+            await uow.conversations.add_message(assistant_msg)
+            await uow.llm_usage.add(usage)
+            await uow.commit()
+
+        return user_msg, assistant_msg, usage
+
+    async def send_message_stream(
+        self,
+        conversation_id: UUID,
+        user_id: UUID,
+        content: str,
+        config: LlmModelConfig,
+    ) -> AsyncIterator[Message | LlmUsage | str]:
+        if not content.strip():
+            raise ValidationError("Message content cannot be empty", "empty_content")
+
+        async with self._uow_factory() as uow:
+            conversation = await uow.conversations.get_by_id(conversation_id, user_id)
+            if conversation is None:
+                raise NotFoundError("Conversation not found", "conversation_not_found")
+
+            project_role = await uow.projects.user_role(conversation.project_id, user_id)
+            if project_role not in {MembershipRole.OWNER, MembershipRole.EDITOR}:
+                raise AuthorizationError("Write access denied", "project_write_denied")
+
+            user_msg = Message(
+                conversation_id=conversation_id,
+                role=MessageRole.USER,
+                content=content.strip(),
+            )
+            await uow.conversations.add_message(user_msg)
+            conversation.updated_at = utc_now()
+            await uow.conversations.save(conversation)
+            await uow.commit()
+
+        yield user_msg
+
+        async with self._uow_factory() as uow:
+            history = await uow.conversations.list_messages(conversation_id, user_id)
+
+        messages_tuples = [(msg.role.value, msg.content) for msg in history]
+
+        system_prompt = "You are a helpful assistant."
+        assert self._chat_agent is not None
+
+        full_content = ""
+        metrics = None
+
+        async for item in self._chat_agent.generate_stream(system_prompt, messages_tuples, config):
+            if isinstance(item, LlmResponseChunk):
+                full_content += item.content
+                yield item.content
+            elif isinstance(item, LlmUsageMetrics):
+                metrics = item
+
+        if metrics is None:
+            metrics = LlmUsageMetrics(
+                provider=config.provider,
+                model=config.model_name,
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                latency_ms=0,
+                cost=0.0,
+            )
+
+        async with self._uow_factory() as uow:
+            assistant_msg = Message(
+                conversation_id=conversation_id,
+                role=MessageRole.ASSISTANT,
+                content=full_content,
+            )
+            usage = LlmUsage(
+                organization_id=conversation.organization_id,
+                conversation_id=conversation_id,
+                message_id=assistant_msg.id,
+                provider=metrics.provider,
+                model=metrics.model,
+                input_tokens=metrics.input_tokens,
+                output_tokens=metrics.output_tokens,
+                total_tokens=metrics.total_tokens,
+                latency_ms=metrics.latency_ms,
+                cost=metrics.cost,
+            )
+
+            conversation = await uow.conversations.get_by_id(conversation_id, user_id)
+            if conversation:
+                conversation.updated_at = utc_now()
+                await uow.conversations.save(conversation)
+
+            await uow.conversations.add_message(assistant_msg)
+            await uow.llm_usage.add(usage)
+            await uow.commit()
+
+        yield assistant_msg
+        yield usage
 
     @staticmethod
     def _validate_title(title: str) -> str:

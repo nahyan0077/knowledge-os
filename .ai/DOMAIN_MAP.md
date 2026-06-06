@@ -42,13 +42,13 @@
 
 ### Conversations
 
-**Status:** Implemented for Sprint 3.
+**Status:** Implemented (enhanced with basic conversational AI and LLM usage tracking in Sprint 4).
 
-- Responsibilities: persistent conversations, ordered messages, lifecycle metadata.
-- Public APIs: `POST /projects/{project_id}/conversations`, `GET /projects/{project_id}/conversations`, `GET /conversations/{conversation_id}`, `PATCH /conversations/{conversation_id}`, `DELETE /conversations/{conversation_id}`, `POST /conversations/{conversation_id}/messages`, `GET /conversations/{conversation_id}/messages`.
-- Tables: `conversations`, `messages`.
-- Dependencies: Projects.
-- Must not access: raw provider SDKs, document persistence internals, workflow storage.
+- Responsibilities: persistent conversations, ordered messages, basic conversational AI chat (using PydanticAI), LLM usage metrics tracking.
+- Public APIs: `POST /projects/{project_id}/conversations`, `GET /projects/{project_id}/conversations`, `GET /conversations/{conversation_id}`, `PATCH /conversations/{conversation_id}`, `DELETE /conversations/{conversation_id}`, `POST /conversations/{conversation_id}/messages`, `GET /conversations/{conversation_id}/messages`, `POST /conversations/{conversation_id}/chat`, `POST /conversations/{conversation_id}/chat/stream`.
+- Tables: `conversations`, `messages`, `llm_usage`.
+- Dependencies: Projects, PydanticAI.
+- Must not access: document persistence internals, Qdrant, Temporal, report generation.
 
 ### Retrieval
 

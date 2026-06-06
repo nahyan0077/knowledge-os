@@ -12,6 +12,7 @@ from knowledge_os.domain.entities import (
     Conversation,
     Document,
     DocumentVersion,
+    LlmUsage,
     Message,
     Organization,
     OrganizationMembership,
@@ -24,6 +25,7 @@ from knowledge_os.infrastructure.database.models import (
     ConversationModel,
     DocumentModel,
     DocumentVersionModel,
+    LlmUsageModel,
     MessageModel,
     OrganizationMemberModel,
     OrganizationModel,
@@ -626,3 +628,47 @@ class SqlAlchemyConversationRepository:
             )
         ).all()
         return [to_message(row) for row in rows]
+
+
+def to_llm_usage(row: LlmUsageModel) -> LlmUsage:
+    return LlmUsage(
+        id=row.id,
+        organization_id=row.organization_id,
+        conversation_id=row.conversation_id,
+        message_id=row.message_id,
+        provider=row.provider,
+        model=row.model,
+        input_tokens=row.input_tokens,
+        output_tokens=row.output_tokens,
+        total_tokens=row.total_tokens,
+        latency_ms=row.latency_ms,
+        cost=float(row.cost),
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyLlmUsageRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(self, usage: LlmUsage) -> None:
+        self.session.add(
+            LlmUsageModel(
+                id=usage.id,
+                organization_id=usage.organization_id,
+                conversation_id=usage.conversation_id,
+                message_id=usage.message_id,
+                provider=usage.provider,
+                model=usage.model,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                total_tokens=usage.total_tokens,
+                latency_ms=usage.latency_ms,
+                cost=usage.cost,
+                created_at=usage.created_at,
+            )
+        )
+
+    async def get_by_id(self, usage_id: UUID) -> LlmUsage | None:
+        row = await self.session.scalar(select(LlmUsageModel).where(LlmUsageModel.id == usage_id))
+        return to_llm_usage(row) if row else None

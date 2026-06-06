@@ -1,19 +1,26 @@
-from typing import Annotated
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sse_starlette import EventSourceResponse
 
 from knowledge_os.api.dependencies import get_conversation_service, get_current_user_id
 from knowledge_os.api.schemas import (
+    ChatMessageRequest,
+    ChatMessageResponse,
     ConversationCreateRequest,
     ConversationListResponse,
     ConversationRenameRequest,
     ConversationResponse,
+    LlmUsageResponse,
     MessageAddRequest,
     MessageListResponse,
     MessageResponse,
 )
 from knowledge_os.application.conversations import ConversationService
+from knowledge_os.application.ports import LlmModelConfig
+from knowledge_os.domain.entities import LlmUsage, Message, MessageRole
 
 router = APIRouter(tags=["conversations"])
 
@@ -117,3 +124,82 @@ async def list_messages(
 ) -> MessageListResponse:
     messages = await service.list_messages(conversation_id, user_id)
     return MessageListResponse(items=[MessageResponse.from_domain(m) for m in messages])
+
+
+@router.post(
+    "/conversations/{conversation_id}/chat",
+    response_model=ChatMessageResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def chat(
+    conversation_id: UUID,
+    req: ChatMessageRequest,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[ConversationService, Depends(get_conversation_service)],
+) -> ChatMessageResponse:
+    config = LlmModelConfig(
+        provider=req.provider,
+        model_name=req.model,
+        temperature=req.temperature,
+    )
+    user_msg, assistant_msg, usage = await service.send_message(
+        conversation_id=conversation_id,
+        user_id=user_id,
+        content=req.content,
+        config=config,
+    )
+    return ChatMessageResponse(
+        user_message=MessageResponse.from_domain(user_msg),
+        assistant_message=MessageResponse.from_domain(assistant_msg),
+        usage=LlmUsageResponse.from_domain(usage),
+    )
+
+
+@router.post("/conversations/{conversation_id}/chat/stream")
+async def chat_stream(
+    conversation_id: UUID,
+    req: ChatMessageRequest,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[ConversationService, Depends(get_conversation_service)],
+) -> EventSourceResponse:
+    async def sse_generator() -> AsyncIterator[dict[str, Any]]:
+        config = LlmModelConfig(
+            provider=req.provider,
+            model_name=req.model,
+            temperature=req.temperature,
+        )
+        try:
+            async for item in service.send_message_stream(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                content=req.content,
+                config=config,
+            ):
+                if isinstance(item, Message):
+                    if item.role == MessageRole.USER:
+                        yield {
+                            "event": "user_message",
+                            "data": MessageResponse.from_domain(item).model_dump_json(),
+                        }
+                    else:
+                        yield {
+                            "event": "assistant_message",
+                            "data": MessageResponse.from_domain(item).model_dump_json(),
+                        }
+                elif isinstance(item, LlmUsage):
+                    yield {
+                        "event": "usage",
+                        "data": LlmUsageResponse.from_domain(item).model_dump_json(),
+                    }
+                elif isinstance(item, str):
+                    yield {
+                        "event": "chunk",
+                        "data": item,
+                    }
+        except Exception as err:
+            yield {
+                "event": "error",
+                "data": str(err),
+            }
+
+    return EventSourceResponse(sse_generator())

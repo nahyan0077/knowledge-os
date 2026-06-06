@@ -8,6 +8,7 @@ from knowledge_os.domain.entities import (
     Conversation,
     Document,
     DocumentVersion,
+    LlmUsage,
     Message,
     Organization,
     Project,
@@ -228,3 +229,48 @@ class MessageResponse(BaseModel):
 
 class MessageListResponse(BaseModel):
     items: list[MessageResponse]
+
+
+class ChatMessageRequest(BaseModel):
+    content: str = Field(min_length=1)
+    provider: str = Field(default="openai", max_length=100)
+    model: str = Field(default="gpt-4o-mini", max_length=100)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+
+class LlmUsageResponse(BaseModel):
+    id: UUID
+    organization_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    latency_ms: int
+    cost: float
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, usage: LlmUsage) -> "LlmUsageResponse":
+        return cls(
+            id=usage.id,
+            organization_id=usage.organization_id,
+            conversation_id=usage.conversation_id,
+            message_id=usage.message_id,
+            provider=usage.provider,
+            model=usage.model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+            latency_ms=usage.latency_ms,
+            cost=usage.cost,
+            created_at=usage.created_at,
+        )
+
+
+class ChatMessageResponse(BaseModel):
+    user_message: MessageResponse
+    assistant_message: MessageResponse
+    usage: LlmUsageResponse

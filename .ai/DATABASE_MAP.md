@@ -25,6 +25,9 @@ erDiagram
     PROJECTS ||--o{ CONVERSATIONS : owns
     CONVERSATIONS ||--o{ MESSAGES : has
     USERS ||--o{ CONVERSATIONS : creates
+    ORGANIZATIONS ||--o{ LLM_USAGE : owns
+    CONVERSATIONS ||--o{ LLM_USAGE : tracks
+    MESSAGES ||--o{ LLM_USAGE : details
 ```
 
 ## Implemented Tables
@@ -41,6 +44,7 @@ erDiagram
 | `document_versions` | Immutable document versions, blob references, status | Organization and document |
 | `conversations` | Conversation metadata, soft deletion | Organization and project |
 | `messages` | Chat history messages, role, content, metadata | Conversation |
+| `llm_usage` | Token counts, costs, and latency details for AI interactions | Organization, conversation, and message |
 
 Critical integrity rules:
 

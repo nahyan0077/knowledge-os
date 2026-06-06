@@ -33,10 +33,19 @@
 - **Database Schema**: PostgreSQL tables (`conversations`, `messages`) mapped using SQLAlchemy 2.0. Resolves the column name clashing with the built-in SQLAlchemy `metadata` property by mapping python property `meta` to DB column `metadata`. Alembic migration `101a38a57c63` created.
 - **Quality Gates**: Ruff linting/formatting and strict `mypy` typechecking passing. 34 unit/integration tests passing.
 - **Integration Tests**: Implemented using `testcontainers` and real PostgreSQL to validate message insertion, sorting order, constraints, and roles enum.
+### Sprint 4 (AI Chat Infrastructure using PydanticAI) - Completed
+- **Domain Entities**: `LlmUsage` entity and `LlmUsageRepository`.
+- **API Endpoints**:
+  - `POST /api/v1/conversations/{conversation_id}/chat` (Send message and get assistant response)
+  - `POST /api/v1/conversations/{conversation_id}/chat/stream` (Send message and stream assistant response via Server-Sent Events (SSE))
+- **AI Adapter**: `PydanticAiAdapter` implementing `ChatAgentPort` to handle model provider abstraction (OpenAI, Gemini, Anthropic, TestModel), token usage metrics, latency, and cost calculations.
+- **Database Schema**: PostgreSQL table `llm_usage` mapped using SQLAlchemy 2.0. Alembic migration `8c3dc169c23f` created.
+- **Integration Tests**: Implemented using `testcontainers` and real PostgreSQL to validate `llm_usage` storage, relationships, and Decimal/Numeric cost precision.
+- **Unit Tests**: Full test coverage for streaming and non-streaming chat services using `FakeChatAgent`.
 
 ## Technical Debt & Risks
 - **Blob Storage Cleanup**: Soft-deleting a document currently retains files in Azure Blob Storage. Hard delete logic or automated cleanup workflows are planned for later phases.
 - **Docker Dependency**: Integration tests require Docker daemon to run.
 
 ## Next Steps
-- Implement Sprint 4 (Retrieval & Grounding).
+- Implement Sprint 5 (Retrieval & Grounding / Qdrant & Embeddings).

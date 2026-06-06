@@ -6,6 +6,7 @@ from knowledge_os.domain.entities import (
     Conversation,
     Document,
     DocumentVersion,
+    LlmUsage,
     Message,
     Organization,
     OrganizationMembership,
@@ -82,6 +83,11 @@ class ConversationRepository(Protocol):
     async def list_messages(self, conversation_id: UUID, user_id: UUID) -> Sequence[Message]: ...
 
 
+class LlmUsageRepository(Protocol):
+    async def add(self, usage: LlmUsage) -> None: ...
+    async def get_by_id(self, usage_id: UUID) -> LlmUsage | None: ...
+
+
 class UnitOfWork(Protocol):
     users: UserRepository
     organizations: OrganizationRepository
@@ -89,6 +95,7 @@ class UnitOfWork(Protocol):
     projects: ProjectRepository
     documents: DocumentRepository
     conversations: ConversationRepository
+    llm_usage: LlmUsageRepository
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
