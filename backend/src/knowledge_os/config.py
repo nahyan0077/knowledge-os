@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     app_name: str = "Knowledge OS API"
     environment: str = "development"
     database_url: str = "postgresql+asyncpg://knowledge_os:knowledge_os@localhost:5432/knowledge_os"
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
     jwt_secret: str = Field(
         default="development-only-secret-change-before-deploy",
         min_length=32,
@@ -24,6 +30,8 @@ class Settings(BaseSettings):
     secure_cookies: bool = False
     azure_storage_connection_string: str | None = None
     azure_storage_container_name: str = "documents"
+    temporal_host: str = "localhost:7233"
+    temporal_namespace: str = "default"
     model_pricing: dict[str, dict[str, float]] = {
         "gpt-4o-mini": {"input_rate_per_million": 0.150, "output_rate_per_million": 0.600},
         "gpt-4o": {"input_rate_per_million": 5.00, "output_rate_per_million": 15.00},

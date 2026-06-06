@@ -82,7 +82,15 @@ class DocumentService:
             await uow.documents.add_version(version)
             await uow.commit()
 
-            return document, version
+        await self._start_processing_workflow(
+            organization_id=organization_id,
+            project_id=project_id,
+            document_id=document.id,
+            version_id=version.id,
+            user_id=user_id,
+        )
+
+        return document, version
 
     async def upload_version(
         self,
@@ -139,7 +147,15 @@ class DocumentService:
             await uow.documents.save(document)
             await uow.commit()
 
-            return version
+        await self._start_processing_workflow(
+            organization_id=document.organization_id,
+            project_id=document.project_id,
+            document_id=document.id,
+            version_id=version.id,
+            user_id=user_id,
+        )
+
+        return version
 
     async def list(
         self,
@@ -191,3 +207,60 @@ class DocumentService:
         if not clean or len(clean) > 255:
             raise ValidationError("Document name must contain 1-255 characters", "invalid_name")
         return clean
+
+    async def _start_processing_workflow(
+        self,
+        organization_id: UUID,
+        project_id: UUID,
+        document_id: UUID,
+        version_id: UUID,
+        user_id: UUID,
+    ) -> None:
+        import logging
+
+        from knowledge_os.domain.entities import WorkflowRun, WorkflowRunStatus
+        from knowledge_os.infrastructure.workflows.client import get_temporal_client
+
+        logger = logging.getLogger(__name__)
+        workflow_id = f"doc-processing-{version_id}"
+        run_id = uuid4()
+
+        async with self._uow_factory() as uow:
+            run = WorkflowRun(
+                id=run_id,
+                organization_id=organization_id,
+                workflow_id=workflow_id,
+                workflow_type="DocumentProcessingWorkflow",
+                resource_type="document",
+                resource_id=document_id,
+                status=WorkflowRunStatus.PENDING,
+            )
+            await uow.workflow_runs.add(run)
+            await uow.commit()
+
+        try:
+            client = await get_temporal_client()
+            payload = {
+                "organization_id": str(organization_id),
+                "project_id": str(project_id),
+                "document_id": str(document_id),
+                "version_id": str(version_id),
+                "user_id": str(user_id),
+                "workflow_run_id": str(run_id),
+            }
+            await client.start_workflow(
+                "DocumentProcessingWorkflow",
+                payload,
+                id=workflow_id,
+                task_queue="document-processing",
+            )
+        except Exception as exc:
+            logger.error(f"Failed to start Temporal workflow for document {document_id}: {exc}")
+            async with self._uow_factory() as uow:
+                existing_run = await uow.workflow_runs.get_by_id(run_id)
+                if existing_run:
+                    existing_run.status = WorkflowRunStatus.FAILED
+                    existing_run.completed_at = utc_now()
+                    existing_run.error_message = f"Temporal start failure: {exc}"
+                    await uow.workflow_runs.save(existing_run)
+                await uow.commit()

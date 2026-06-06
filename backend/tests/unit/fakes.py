@@ -20,6 +20,8 @@ from knowledge_os.domain.entities import (
     ProjectMembership,
     RefreshSession,
     User,
+    WorkflowEvent,
+    WorkflowRun,
     utc_now,
 )
 
@@ -37,6 +39,8 @@ class Store:
     conversations: dict[UUID, Conversation] = field(default_factory=dict)
     messages: list[Message] = field(default_factory=list)
     llm_usage: dict[UUID, LlmUsage] = field(default_factory=dict)
+    workflow_runs: dict[UUID, WorkflowRun] = field(default_factory=dict)
+    workflow_events: list[WorkflowEvent] = field(default_factory=list)
 
 
 class UserRepo:
@@ -373,6 +377,59 @@ class LlmUsageRepo:
         return copy.deepcopy(usage) if usage else None
 
 
+class FakeWorkflowRunRepository:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+
+    async def add(self, run: WorkflowRun) -> None:
+        self.store.workflow_runs[run.id] = run
+
+    async def save(self, run: WorkflowRun) -> None:
+        self.store.workflow_runs[run.id] = run
+
+    async def get_by_id(self, run_id: UUID) -> WorkflowRun | None:
+        import copy
+
+        run = self.store.workflow_runs.get(run_id)
+        return copy.deepcopy(run) if run else None
+
+    async def get_by_workflow_id(self, workflow_id: str) -> WorkflowRun | None:
+        import copy
+
+        run = next(
+            (r for r in self.store.workflow_runs.values() if r.workflow_id == workflow_id), None
+        )
+        return copy.deepcopy(run) if run else None
+
+    async def list_for_resource(
+        self, resource_type: str, resource_id: UUID
+    ) -> Sequence[WorkflowRun]:
+        import copy
+
+        runs = [
+            r
+            for r in self.store.workflow_runs.values()
+            if r.resource_type == resource_type and r.resource_id == resource_id
+        ]
+        runs.sort(key=lambda x: x.started_at, reverse=True)
+        return [copy.deepcopy(r) for r in runs]
+
+
+class FakeWorkflowEventRepository:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+
+    async def add(self, event: WorkflowEvent) -> None:
+        self.store.workflow_events.append(event)
+
+    async def list_for_run(self, workflow_run_id: UUID) -> Sequence[WorkflowEvent]:
+        import copy
+
+        events = [e for e in self.store.workflow_events if e.workflow_run_id == workflow_run_id]
+        events.sort(key=lambda x: x.created_at)
+        return [copy.deepcopy(e) for e in events]
+
+
 class FakeUnitOfWork:
     def __init__(self, store: Store) -> None:
         self.store = store
@@ -383,6 +440,8 @@ class FakeUnitOfWork:
         self.documents = DocumentRepo(store)
         self.conversations = ConversationRepo(store)
         self.llm_usage = LlmUsageRepo(store)
+        self.workflow_runs = FakeWorkflowRunRepository(store)
+        self.workflow_events = FakeWorkflowEventRepository(store)
         self.commits = 0
 
     async def __aenter__(self) -> "FakeUnitOfWork":
@@ -393,6 +452,9 @@ class FakeUnitOfWork:
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def flush(self) -> None:
+        pass
 
 
 class FakePasswordService:

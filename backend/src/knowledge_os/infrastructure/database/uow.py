@@ -8,6 +8,8 @@ from knowledge_os.domain.repositories import (
     ProjectRepository,
     RefreshSessionRepository,
     UserRepository,
+    WorkflowEventRepository,
+    WorkflowRunRepository,
 )
 from knowledge_os.infrastructure.database.session import session_factory
 from knowledge_os.infrastructure.repositories.sqlalchemy import (
@@ -18,6 +20,8 @@ from knowledge_os.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyProjectRepository,
     SqlAlchemyRefreshSessionRepository,
     SqlAlchemyUserRepository,
+    SqlAlchemyWorkflowEventRepository,
+    SqlAlchemyWorkflowRunRepository,
 )
 
 
@@ -29,6 +33,8 @@ class SqlAlchemyUnitOfWork:
     documents: DocumentRepository
     conversations: ConversationRepository
     llm_usage: LlmUsageRepository
+    workflow_runs: WorkflowRunRepository
+    workflow_events: WorkflowEventRepository
 
     def __init__(self) -> None:
         self.session: AsyncSession | None = None
@@ -42,6 +48,8 @@ class SqlAlchemyUnitOfWork:
         self.documents = SqlAlchemyDocumentRepository(self.session)
         self.conversations = SqlAlchemyConversationRepository(self.session)
         self.llm_usage = SqlAlchemyLlmUsageRepository(self.session)
+        self.workflow_runs = SqlAlchemyWorkflowRunRepository(self.session)
+        self.workflow_events = SqlAlchemyWorkflowEventRepository(self.session)
         return self
 
     async def __aexit__(
@@ -58,3 +66,7 @@ class SqlAlchemyUnitOfWork:
     async def commit(self) -> None:
         assert self.session is not None
         await self.session.commit()
+
+    async def flush(self) -> None:
+        assert self.session is not None
+        await self.session.flush()

@@ -82,13 +82,13 @@
 
 ### Workflows
 
-**Status:** Planned.
+**Status:** Implemented.
 
-- Responsibilities: durable orchestration, progress projection, retry/cancellation semantics.
-- Public APIs: start/query/cancel workflow operations; workflow monitor API.
-- Tables: `workflow_runs`; Temporal owns execution history.
-- Dependencies: domain application interfaces and infrastructure activities.
-- Must not access: domain repositories from deterministic workflow code; large document bodies in workflow history.
+- Responsibilities: durable orchestration, progress projection, retry/cancellation semantics, tracking workflow execution state and events.
+- Public APIs: `GET /api/v1/workflows/{run_id}`, `GET /api/v1/projects/{project_id}/workflows`; `WorkflowService`.
+- Tables: `workflow_runs`, `workflow_events`; Temporal owns execution history.
+- Dependencies: domain application interfaces and infrastructure activities, Temporal Client/Worker.
+- Must not access: domain repositories from deterministic workflow code; large document bodies in workflow history. All DB operations are isolated in activities.
 
 ## Dependency Direction
 

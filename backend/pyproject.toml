@@ -17,6 +17,7 @@ dependencies = [
   "azure-storage-blob>=12.29.0",
   "pydantic-ai>=1.106.0",
   "sse-starlette>=3.4.4",
+  "temporalio>=1.28.0",
 ]
 
 [dependency-groups]

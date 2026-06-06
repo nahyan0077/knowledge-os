@@ -20,6 +20,8 @@ from knowledge_os.domain.entities import (
     ProjectMembership,
     RefreshSession,
     User,
+    WorkflowEvent,
+    WorkflowRun,
 )
 from knowledge_os.infrastructure.database.models import (
     ConversationModel,
@@ -33,6 +35,8 @@ from knowledge_os.infrastructure.database.models import (
     ProjectModel,
     RefreshSessionModel,
     UserModel,
+    WorkflowEventModel,
+    WorkflowRunModel,
 )
 
 
@@ -696,3 +700,113 @@ class SqlAlchemyLlmUsageRepository:
     async def get_by_id(self, usage_id: UUID) -> LlmUsage | None:
         row = await self.session.scalar(select(LlmUsageModel).where(LlmUsageModel.id == usage_id))
         return to_llm_usage(row) if row else None
+
+
+def to_workflow_run(row: WorkflowRunModel) -> WorkflowRun:
+    return WorkflowRun(
+        id=row.id,
+        organization_id=row.organization_id,
+        workflow_id=row.workflow_id,
+        workflow_type=row.workflow_type,
+        resource_type=row.resource_type,
+        resource_id=row.resource_id,
+        status=row.status,
+        started_at=row.started_at,
+        completed_at=row.completed_at,
+        error_message=row.error_message,
+    )
+
+
+def to_workflow_event(row: WorkflowEventModel) -> WorkflowEvent:
+    return WorkflowEvent(
+        id=row.id,
+        workflow_run_id=row.workflow_run_id,
+        event_type=row.event_type,
+        payload=row.payload,
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyWorkflowRunRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(self, run: WorkflowRun) -> None:
+        self.session.add(
+            WorkflowRunModel(
+                id=run.id,
+                organization_id=run.organization_id,
+                workflow_id=run.workflow_id,
+                workflow_type=run.workflow_type,
+                resource_type=run.resource_type,
+                resource_id=run.resource_id,
+                status=run.status,
+                started_at=run.started_at,
+                completed_at=run.completed_at,
+                error_message=run.error_message,
+            )
+        )
+
+    async def save(self, run: WorkflowRun) -> None:
+        await self.session.execute(
+            update(WorkflowRunModel)
+            .where(WorkflowRunModel.id == run.id)
+            .values(
+                status=run.status,
+                completed_at=run.completed_at,
+                error_message=run.error_message,
+            )
+        )
+
+    async def get_by_id(self, run_id: UUID) -> WorkflowRun | None:
+        row = await self.session.scalar(
+            select(WorkflowRunModel).where(WorkflowRunModel.id == run_id)
+        )
+        return to_workflow_run(row) if row else None
+
+    async def get_by_workflow_id(self, workflow_id: str) -> WorkflowRun | None:
+        row = await self.session.scalar(
+            select(WorkflowRunModel).where(WorkflowRunModel.workflow_id == workflow_id)
+        )
+        return to_workflow_run(row) if row else None
+
+    async def list_for_resource(
+        self, resource_type: str, resource_id: UUID
+    ) -> Sequence[WorkflowRun]:
+        rows = (
+            await self.session.scalars(
+                select(WorkflowRunModel)
+                .where(
+                    WorkflowRunModel.resource_type == resource_type,
+                    WorkflowRunModel.resource_id == resource_id,
+                )
+                .order_by(WorkflowRunModel.started_at.desc())
+            )
+        ).all()
+        return [to_workflow_run(row) for row in rows]
+
+
+class SqlAlchemyWorkflowEventRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(self, event: WorkflowEvent) -> None:
+        self.session.add(
+            WorkflowEventModel(
+                id=event.id,
+                workflow_run_id=event.workflow_run_id,
+                event_type=event.event_type,
+                payload=event.payload,
+                created_at=event.created_at,
+            )
+        )
+
+    async def list_for_run(self, workflow_run_id: UUID) -> Sequence[WorkflowEvent]:
+        rows = (
+            await self.session.scalars(
+                select(WorkflowEventModel)
+                .where(WorkflowEventModel.workflow_run_id == workflow_run_id)
+                .order_by(WorkflowEventModel.created_at.asc())
+            )
+        ).all()
+        return [to_workflow_event(row) for row in rows]

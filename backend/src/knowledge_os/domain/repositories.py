@@ -14,6 +14,8 @@ from knowledge_os.domain.entities import (
     ProjectMembership,
     RefreshSession,
     User,
+    WorkflowEvent,
+    WorkflowRun,
 )
 
 
@@ -89,6 +91,21 @@ class LlmUsageRepository(Protocol):
     async def get_by_id(self, usage_id: UUID) -> LlmUsage | None: ...
 
 
+class WorkflowRunRepository(Protocol):
+    async def add(self, run: WorkflowRun) -> None: ...
+    async def save(self, run: WorkflowRun) -> None: ...
+    async def get_by_id(self, run_id: UUID) -> WorkflowRun | None: ...
+    async def get_by_workflow_id(self, workflow_id: str) -> WorkflowRun | None: ...
+    async def list_for_resource(
+        self, resource_type: str, resource_id: UUID
+    ) -> Sequence[WorkflowRun]: ...
+
+
+class WorkflowEventRepository(Protocol):
+    async def add(self, event: WorkflowEvent) -> None: ...
+    async def list_for_run(self, workflow_run_id: UUID) -> Sequence[WorkflowEvent]: ...
+
+
 class UnitOfWork(Protocol):
     users: UserRepository
     organizations: OrganizationRepository
@@ -97,7 +114,10 @@ class UnitOfWork(Protocol):
     documents: DocumentRepository
     conversations: ConversationRepository
     llm_usage: LlmUsageRepository
+    workflow_runs: WorkflowRunRepository
+    workflow_events: WorkflowEventRepository
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
     async def commit(self) -> None: ...
+    async def flush(self) -> None: ...

@@ -34,6 +34,7 @@ class ProjectService:
                 created_by=user_id,
             )
             await uow.projects.add(project)
+            await uow.flush()
             await uow.projects.add_membership(
                 ProjectMembership(
                     organization_id=organization_id,

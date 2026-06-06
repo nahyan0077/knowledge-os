@@ -72,6 +72,7 @@ class AuthService:
             )
             await uow.users.add(user)
             await uow.organizations.add(organization)
+            await uow.flush()
             await uow.organizations.add_membership(
                 OrganizationMembership(
                     organization_id=organization.id,

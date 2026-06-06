@@ -9,6 +9,7 @@ from knowledge_os.application.auth import AuthService
 from knowledge_os.application.conversations import ConversationService
 from knowledge_os.application.documents import DocumentService
 from knowledge_os.application.projects import ProjectService
+from knowledge_os.application.workflows import WorkflowService
 from knowledge_os.config import Settings, get_settings
 from knowledge_os.domain.common import AuthenticationError
 from knowledge_os.domain.repositories import UnitOfWork
@@ -67,6 +68,12 @@ def get_access_token_service(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> JwtAccessTokenService:
     return JwtAccessTokenService(settings)
+
+
+def get_workflow_service() -> WorkflowService:
+    from knowledge_os.application.workflows import WorkflowService
+
+    return WorkflowService(uow_factory=get_uow)
 
 
 def get_current_user_id(

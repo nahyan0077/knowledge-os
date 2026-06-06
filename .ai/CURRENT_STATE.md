@@ -61,9 +61,19 @@
 - **Project Settings**: General settings panel supporting project title/description updates and complete project workspace deletion.
 - **Quality Gates**: Production Turbopack compilation passing with zero TypeScript or ESLint errors.
 
+### Sprint 5 (Temporal Workflow Infrastructure) - Completed
+- **Temporal Setup**: Integrated Temporal client/worker daemon, configured workflow and activity registrations, and set task queues.
+- **Workflow Orchestration**: Implemented `DocumentProcessingWorkflow` executing activities `validate_document`, `extract_document_metadata`, and `update_document_status`.
+- **Automatic Triggering**: Document upload/version creation triggers the workflow asynchronously.
+- **Database Schema**: Created `workflow_runs` and `workflow_events` tables for state tracking, with repository implementations and Alembic migration `35bf1154174d`.
+- **API Endpoints**:
+  - `GET /api/v1/workflows/{run_id}` (Query run progress and events)
+  - `GET /api/v1/projects/{project_id}/workflows` (List runs by resource type/ID)
+- **Unit and Integration Tests**: Implemented time-skipping Temporal unit tests and FastAPI route tests; all 45 checks pass.
+
 ## Technical Debt & Risks
 - **Blob Storage Cleanup**: Soft-deleting a document currently retains files in Azure Blob Storage. Hard delete logic or automated cleanup workflows are planned for later phases.
 - **Docker Dependency**: Integration tests require Docker daemon to run.
 
 ## Next Steps
-- Implement Sprint 5 (Retrieval & Grounding / Qdrant & Embeddings / RAG integration).
+- Implement Sprint 6 (Retrieval & Grounding / Qdrant & Embeddings / RAG integration).

@@ -190,3 +190,35 @@ class LlmUsage:
     cost: float
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
+
+
+class WorkflowRunStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    TERMINATED = "terminated"
+    CANCELLED = "cancelled"
+
+
+@dataclass(slots=True)
+class WorkflowRun:
+    organization_id: UUID
+    workflow_id: str
+    workflow_type: str
+    resource_type: str
+    resource_id: UUID
+    status: WorkflowRunStatus = WorkflowRunStatus.PENDING
+    started_at: datetime = field(default_factory=utc_now)
+    completed_at: datetime | None = None
+    error_message: str | None = None
+    id: UUID = field(default_factory=uuid4)
+
+
+@dataclass(slots=True)
+class WorkflowEvent:
+    workflow_run_id: UUID
+    event_type: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)

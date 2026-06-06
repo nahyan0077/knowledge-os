@@ -19,8 +19,8 @@ flowchart LR
     User --> Web[Next.js Web]
     Web --> API[FastAPI API]
     API --> PG[(PostgreSQL)]
-    API --> Temporal[Temporal - Planned]
-    Temporal --> Workers[Workers - Planned]
+    API --> Temporal[Temporal]
+    Temporal --> Workers[Workers]
     Workers --> PG
     Workers --> Blob[Azure Blob]
     Workers --> Qdrant[Qdrant - Planned]
@@ -64,7 +64,7 @@ frontend/src/
 |---|---|---|
 | FastAPI API | Synchronous commands/queries, auth, streaming entry point | Implemented |
 | Next.js web | User interface and browser state | Implemented |
-| Temporal ingestion worker | Document extraction, chunking, embeddings, indexing | Planned |
+| Temporal ingestion worker | Document validation, status updates, metadata extraction | Implemented |
 | Temporal agent worker | Agent and report execution | Planned |
 | PostgreSQL | Business truth and product-facing projections | Implemented |
 | Qdrant | Derived vector index | Planned |
@@ -98,7 +98,7 @@ HTTP request
   -> response schema
 ```
 
-Planned asynchronous command:
+Implemented asynchronous command:
 
 ```text
 HTTP command

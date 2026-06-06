@@ -13,6 +13,8 @@ from knowledge_os.domain.entities import (
     Organization,
     Project,
     User,
+    WorkflowEvent,
+    WorkflowRun,
 )
 
 
@@ -278,3 +280,57 @@ class ChatMessageResponse(BaseModel):
     user_message: MessageResponse
     assistant_message: MessageResponse
     usage: LlmUsageResponse
+
+
+class WorkflowEventResponse(BaseModel):
+    id: UUID
+    workflow_run_id: UUID
+    event_type: str
+    payload: dict[str, Any]
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, event: WorkflowEvent) -> "WorkflowEventResponse":
+        return cls(
+            id=event.id,
+            workflow_run_id=event.workflow_run_id,
+            event_type=event.event_type,
+            payload=event.payload,
+            created_at=event.created_at,
+        )
+
+
+class WorkflowRunResponse(BaseModel):
+    id: UUID
+    organization_id: UUID
+    workflow_id: str
+    workflow_type: str
+    resource_type: str
+    resource_id: UUID
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    error_message: str | None
+    events: list[WorkflowEventResponse] | None = None
+
+    @classmethod
+    def from_domain(
+        cls, run: WorkflowRun, events: list[WorkflowEventResponse] | None = None
+    ) -> "WorkflowRunResponse":
+        return cls(
+            id=run.id,
+            organization_id=run.organization_id,
+            workflow_id=run.workflow_id,
+            workflow_type=run.workflow_type,
+            resource_type=run.resource_type,
+            resource_id=run.resource_id,
+            status=run.status.value,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+            error_message=run.error_message,
+            events=events,
+        )
+
+
+class WorkflowRunListResponse(BaseModel):
+    items: list[WorkflowRunResponse]
