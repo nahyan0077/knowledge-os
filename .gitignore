@@ -11,6 +11,7 @@ Thumbs.db
 # Backend environment and caches
 backend/.env
 backend/.venv/
+backend/local_storage/
 backend/__pycache__/
 backend/.pytest_cache/
 backend/.ruff_cache/

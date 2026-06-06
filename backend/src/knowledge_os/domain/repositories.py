@@ -3,6 +3,8 @@ from typing import Protocol
 from uuid import UUID
 
 from knowledge_os.domain.entities import (
+    Document,
+    DocumentVersion,
     Organization,
     OrganizationMembership,
     Project,
@@ -44,11 +46,34 @@ class ProjectRepository(Protocol):
     async def user_role(self, project_id: UUID, user_id: UUID) -> str | None: ...
 
 
+class DocumentRepository(Protocol):
+    async def add(self, document: Document) -> None: ...
+    async def save(self, document: Document) -> None: ...
+    async def get_by_id(self, document_id: UUID, user_id: UUID) -> Document | None: ...
+    async def list_for_project(
+        self, organization_id: UUID, project_id: UUID, user_id: UUID, limit: int
+    ) -> Sequence[Document]: ...
+    async def add_version(self, version: DocumentVersion) -> None: ...
+    async def save_version(self, version: DocumentVersion) -> None: ...
+    async def get_version_by_id(
+        self, version_id: UUID, user_id: UUID
+    ) -> DocumentVersion | None: ...
+
+    async def get_version_by_number(
+        self, document_id: UUID, version_number: int, user_id: UUID
+    ) -> DocumentVersion | None: ...
+
+    async def list_versions(
+        self, document_id: UUID, user_id: UUID
+    ) -> Sequence[DocumentVersion]: ...
+
+
 class UnitOfWork(Protocol):
     users: UserRepository
     organizations: OrganizationRepository
     refresh_sessions: RefreshSessionRepository
     projects: ProjectRepository
+    documents: DocumentRepository
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...

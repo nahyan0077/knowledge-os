@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
     secure_cookies: bool = False
+    azure_storage_connection_string: str | None = None
+    azure_storage_container_name: str = "documents"
 
 
 @lru_cache

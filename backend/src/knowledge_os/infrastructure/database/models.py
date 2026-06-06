@@ -3,6 +3,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     Enum,
@@ -20,6 +21,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from knowledge_os.domain.entities import (
+    DocumentVersionStatus,
     MembershipRole,
     OrganizationType,
     UserStatus,
@@ -182,4 +184,67 @@ class ProjectMemberModel(Base):
         ),
         UniqueConstraint("project_id", "user_id", name="uq_project_member"),
         Index("ix_project_members_org_user", "organization_id", "user_id"),
+    )
+
+
+class DocumentModel(TimestampMixin, Base):
+    __tablename__ = "documents"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    current_version_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    created_by: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "project_id"],
+            ["projects.organization_id", "projects.id"],
+            name="fk_documents_tenant_project",
+            ondelete="CASCADE",
+        ),
+        Index("ix_documents_org_project", "organization_id", "project_id"),
+    )
+
+
+class DocumentVersionModel(TimestampMixin, Base):
+    __tablename__ = "document_versions"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    storage_provider: Mapped[str] = mapped_column(String(50), default="azure_blob", nullable=False)
+    blob_path: Mapped[str] = mapped_column(Text, nullable=False)
+    source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    etag: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[DocumentVersionStatus] = mapped_column(
+        Enum(
+            DocumentVersionStatus,
+            name="document_version_status",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        default=DocumentVersionStatus.PENDING_UPLOAD,
+        nullable=False,
+    )
+    failure_code: Mapped[str | None] = mapped_column(String(100))
+    failure_detail: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint("document_id", "version_number", name="uq_document_version"),
+        Index("ix_document_versions_org_status", "organization_id", "status"),
+        Index("ix_document_versions_sha256", "organization_id", "sha256"),
     )

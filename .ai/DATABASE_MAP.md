@@ -19,6 +19,9 @@ erDiagram
     USERS ||--o{ PROJECTS : creates
     PROJECTS ||--o{ PROJECT_MEMBERS : grants
     USERS ||--o{ PROJECT_MEMBERS : receives
+    PROJECTS ||--o{ DOCUMENTS : owns
+    DOCUMENTS ||--o{ DOCUMENT_VERSIONS : has
+    USERS ||--o{ DOCUMENTS : creates
 ```
 
 ## Implemented Tables
@@ -31,6 +34,8 @@ erDiagram
 | `organization_members` | User-to-tenant roles | Organization |
 | `projects` | Project metadata, soft deletion, optimistic version | Organization |
 | `project_members` | User-to-project roles | Organization and project |
+| `documents` | Logical document metadata, soft deletion | Organization and project |
+| `document_versions` | Immutable document versions, blob references, status | Organization and document |
 
 Critical integrity rules:
 
@@ -45,7 +50,6 @@ Critical integrity rules:
 
 | Domain | Tables |
 |---|---|
-| Documents | `documents`, `document_versions` |
 | Knowledge | `chunks`, `knowledge_entries`, `index_manifests` |
 | Conversations | `conversations`, `messages`, `message_citations` |
 | Agents | `agent_runs`, `agent_run_steps` |

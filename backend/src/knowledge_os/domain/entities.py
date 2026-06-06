@@ -95,3 +95,45 @@ class ProjectMembership:
     role: MembershipRole
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
+
+
+class DocumentVersionStatus(StrEnum):
+    PENDING_UPLOAD = "pending_upload"
+    UPLOADED = "uploaded"
+    PROCESSING = "processing"
+    INDEXED = "indexed"
+    FAILED = "failed"
+    DELETED = "deleted"
+
+
+@dataclass(slots=True)
+class Document:
+    organization_id: UUID
+    project_id: UUID
+    name: str
+    created_by: UUID
+    current_version_id: UUID | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+    deleted_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class DocumentVersion:
+    organization_id: UUID
+    document_id: UUID
+    version_number: int
+    blob_path: str
+    source_filename: str
+    mime_type: str
+    size_bytes: int
+    sha256: str
+    etag: str
+    storage_provider: str = "azure_blob"
+    status: DocumentVersionStatus = DocumentVersionStatus.PENDING_UPLOAD
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)

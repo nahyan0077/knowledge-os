@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from knowledge_os.domain.entities import Organization, Project, User
+from knowledge_os.domain.entities import Document, DocumentVersion, Organization, Project, User
 
 
 class RegisterRequest(BaseModel):
@@ -90,3 +90,67 @@ class ProblemDetail(BaseModel):
     status: int
     detail: str
     error_code: str
+
+
+class DocumentResponse(BaseModel):
+    id: UUID
+    organization_id: UUID
+    project_id: UUID
+    name: str
+    current_version_id: UUID | None
+    created_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, doc: Document) -> "DocumentResponse":
+        return cls(
+            id=doc.id,
+            organization_id=doc.organization_id,
+            project_id=doc.project_id,
+            name=doc.name,
+            current_version_id=doc.current_version_id,
+            created_by=doc.created_by,
+            created_at=doc.created_at,
+            updated_at=doc.updated_at,
+        )
+
+
+class DocumentListResponse(BaseModel):
+    items: list[DocumentResponse]
+
+
+class DocumentVersionResponse(BaseModel):
+    id: UUID
+    organization_id: UUID
+    document_id: UUID
+    version_number: int
+    blob_path: str
+    source_filename: str
+    mime_type: str
+    size_bytes: int
+    sha256: str
+    etag: str
+    storage_provider: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, ver: DocumentVersion) -> "DocumentVersionResponse":
+        return cls(
+            id=ver.id,
+            organization_id=ver.organization_id,
+            document_id=ver.document_id,
+            version_number=ver.version_number,
+            blob_path=ver.blob_path,
+            source_filename=ver.source_filename,
+            mime_type=ver.mime_type,
+            size_bytes=ver.size_bytes,
+            sha256=ver.sha256,
+            etag=ver.etag,
+            storage_provider=ver.storage_provider,
+            status=ver.status.value,
+            created_at=ver.created_at,
+            updated_at=ver.updated_at,
+        )

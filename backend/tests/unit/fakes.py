@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from knowledge_os.domain.entities import (
+    Document,
+    DocumentVersion,
     Organization,
     OrganizationMembership,
     Project,
@@ -21,6 +23,8 @@ class Store:
     sessions: dict[UUID, RefreshSession] = field(default_factory=dict)
     projects: dict[UUID, Project] = field(default_factory=dict)
     project_memberships: list[ProjectMembership] = field(default_factory=list)
+    documents: dict[UUID, Document] = field(default_factory=dict)
+    versions: dict[UUID, DocumentVersion] = field(default_factory=dict)
 
 
 class UserRepo:
@@ -148,6 +152,115 @@ class ProjectRepo:
         return membership.role.value if membership else None
 
 
+class DocumentRepo:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+
+    async def add(self, document: Document) -> None:
+        self.store.documents[document.id] = document
+
+    async def save(self, document: Document) -> None:
+        self.store.documents[document.id] = document
+
+    async def get_by_id(self, document_id: UUID, user_id: UUID) -> Document | None:
+        import copy
+
+        doc = self.store.documents.get(document_id)
+        if doc is None or doc.deleted_at is not None:
+            return None
+        allowed = any(
+            item.project_id == doc.project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        return copy.deepcopy(doc) if allowed else None
+
+    async def list_for_project(
+        self, organization_id: UUID, project_id: UUID, user_id: UUID, limit: int
+    ) -> Sequence[Document]:
+        import copy
+
+        allowed = any(
+            item.project_id == project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        if not allowed:
+            return []
+        return [
+            copy.deepcopy(doc)
+            for doc in self.store.documents.values()
+            if doc.organization_id == organization_id
+            and doc.project_id == project_id
+            and doc.deleted_at is None
+        ][:limit]
+
+    async def add_version(self, version: DocumentVersion) -> None:
+        self.store.versions[version.id] = version
+
+    async def save_version(self, version: DocumentVersion) -> None:
+        self.store.versions[version.id] = version
+
+    async def get_version_by_id(self, version_id: UUID, user_id: UUID) -> DocumentVersion | None:
+        import copy
+
+        ver = self.store.versions.get(version_id)
+        if ver is None:
+            return None
+        doc = self.store.documents.get(ver.document_id)
+        if doc is None or doc.deleted_at is not None:
+            return None
+        allowed = any(
+            item.project_id == doc.project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        return copy.deepcopy(ver) if allowed else None
+
+    async def get_version_by_number(
+        self, document_id: UUID, version_number: int, user_id: UUID
+    ) -> DocumentVersion | None:
+        import copy
+
+        doc = self.store.documents.get(document_id)
+        if doc is None or doc.deleted_at is not None:
+            return None
+        allowed = any(
+            item.project_id == doc.project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        if not allowed:
+            return None
+        ver = next(
+            (
+                v
+                for v in self.store.versions.values()
+                if v.document_id == document_id and v.version_number == version_number
+            ),
+            None,
+        )
+        return copy.deepcopy(ver) if ver else None
+
+    async def list_versions(self, document_id: UUID, user_id: UUID) -> Sequence[DocumentVersion]:
+        import copy
+
+        doc = self.store.documents.get(document_id)
+        if doc is None or doc.deleted_at is not None:
+            return []
+        allowed = any(
+            item.project_id == doc.project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        if not allowed:
+            return []
+        return sorted(
+            [
+                copy.deepcopy(v)
+                for v in self.store.versions.values()
+                if v.document_id == document_id
+            ],
+            key=lambda x: x.version_number,
+            reverse=True,
+        )
+
+
 class FakeUnitOfWork:
     def __init__(self, store: Store) -> None:
         self.store = store
@@ -155,6 +268,7 @@ class FakeUnitOfWork:
         self.organizations = OrganizationRepo(store)
         self.refresh_sessions = SessionRepo(store)
         self.projects = ProjectRepo(store)
+        self.documents = DocumentRepo(store)
         self.commits = 0
 
     async def __aenter__(self) -> "FakeUnitOfWork":

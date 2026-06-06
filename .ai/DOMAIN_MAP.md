@@ -32,12 +32,12 @@
 
 ### Documents
 
-**Status:** Planned.
+**Status:** Implemented for Sprint 2 document lifecycle management.
 
 - Responsibilities: upload metadata, logical documents, immutable versions, lifecycle status.
-- Public APIs: initiate/finalize upload, list/read/delete/reprocess document versions.
+- Public APIs: `POST /projects/{project_id}/documents`, `POST /projects/{project_id}/documents/{document_id}/versions`, `GET /projects/{project_id}/documents`, `GET /documents/{document_id}`, `DELETE /documents/{document_id}`.
 - Tables: `documents`, `document_versions`.
-- Dependencies: Projects, Blob port, Workflow public interface.
+- Dependencies: Projects, Blob port.
 - Must not access: Qdrant directly, conversation repositories, agent internals.
 
 ### Conversations

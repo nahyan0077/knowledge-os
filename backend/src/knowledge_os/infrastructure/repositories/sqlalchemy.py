@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from knowledge_os.domain.common import ConflictError
 from knowledge_os.domain.entities import (
+    Document,
+    DocumentVersion,
     Organization,
     OrganizationMembership,
     Project,
@@ -17,6 +19,8 @@ from knowledge_os.domain.entities import (
     User,
 )
 from knowledge_os.infrastructure.database.models import (
+    DocumentModel,
+    DocumentVersionModel,
     OrganizationMemberModel,
     OrganizationModel,
     ProjectMemberModel,
@@ -313,3 +317,186 @@ class SqlAlchemyProjectRepository:
             )
         )
         return role.value if role else None
+
+
+def to_document(row: DocumentModel) -> Document:
+    return Document(
+        id=row.id,
+        organization_id=row.organization_id,
+        project_id=row.project_id,
+        name=row.name,
+        current_version_id=row.current_version_id,
+        created_by=row.created_by,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        deleted_at=row.deleted_at,
+    )
+
+
+def to_document_version(row: DocumentVersionModel) -> DocumentVersion:
+    return DocumentVersion(
+        id=row.id,
+        organization_id=row.organization_id,
+        document_id=row.document_id,
+        version_number=row.version_number,
+        storage_provider=row.storage_provider,
+        blob_path=row.blob_path,
+        source_filename=row.source_filename,
+        mime_type=row.mime_type,
+        size_bytes=row.size_bytes,
+        sha256=row.sha256,
+        etag=row.etag,
+        status=row.status,
+        failure_code=row.failure_code,
+        failure_detail=row.failure_detail,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+class SqlAlchemyDocumentRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(self, document: Document) -> None:
+        self.session.add(
+            DocumentModel(
+                id=document.id,
+                organization_id=document.organization_id,
+                project_id=document.project_id,
+                name=document.name,
+                current_version_id=document.current_version_id,
+                created_by=document.created_by,
+                deleted_at=document.deleted_at,
+                created_at=document.created_at,
+                updated_at=document.updated_at,
+            )
+        )
+
+    async def save(self, document: Document) -> None:
+        await self.session.execute(
+            update(DocumentModel)
+            .where(
+                DocumentModel.id == document.id,
+                DocumentModel.organization_id == document.organization_id,
+            )
+            .values(
+                name=document.name,
+                current_version_id=document.current_version_id,
+                deleted_at=document.deleted_at,
+                updated_at=document.updated_at,
+            )
+        )
+
+    async def get_by_id(self, document_id: UUID, user_id: UUID) -> Document | None:
+        row = await self.session.scalar(
+            select(DocumentModel)
+            .join(ProjectMemberModel, ProjectMemberModel.project_id == DocumentModel.project_id)
+            .where(
+                DocumentModel.id == document_id,
+                ProjectMemberModel.user_id == user_id,
+                DocumentModel.deleted_at.is_(None),
+            )
+        )
+        return to_document(row) if row else None
+
+    async def list_for_project(
+        self, organization_id: UUID, project_id: UUID, user_id: UUID, limit: int
+    ) -> Sequence[Document]:
+        rows = (
+            await self.session.scalars(
+                select(DocumentModel)
+                .join(ProjectMemberModel, ProjectMemberModel.project_id == DocumentModel.project_id)
+                .where(
+                    DocumentModel.organization_id == organization_id,
+                    DocumentModel.project_id == project_id,
+                    ProjectMemberModel.user_id == user_id,
+                    DocumentModel.deleted_at.is_(None),
+                )
+                .order_by(DocumentModel.updated_at.desc())
+                .limit(limit)
+            )
+        ).all()
+        return [to_document(row) for row in rows]
+
+    async def add_version(self, version: DocumentVersion) -> None:
+        self.session.add(
+            DocumentVersionModel(
+                id=version.id,
+                organization_id=version.organization_id,
+                document_id=version.document_id,
+                version_number=version.version_number,
+                storage_provider=version.storage_provider,
+                blob_path=version.blob_path,
+                source_filename=version.source_filename,
+                mime_type=version.mime_type,
+                size_bytes=version.size_bytes,
+                sha256=version.sha256,
+                etag=version.etag,
+                status=version.status,
+                failure_code=version.failure_code,
+                failure_detail=version.failure_detail,
+                created_at=version.created_at,
+                updated_at=version.updated_at,
+            )
+        )
+
+    async def save_version(self, version: DocumentVersion) -> None:
+        await self.session.execute(
+            update(DocumentVersionModel)
+            .where(
+                DocumentVersionModel.id == version.id,
+                DocumentVersionModel.organization_id == version.organization_id,
+            )
+            .values(
+                status=version.status,
+                failure_code=version.failure_code,
+                failure_detail=version.failure_detail,
+                updated_at=version.updated_at,
+            )
+        )
+
+    async def get_version_by_id(self, version_id: UUID, user_id: UUID) -> DocumentVersion | None:
+        row = await self.session.scalar(
+            select(DocumentVersionModel)
+            .join(DocumentModel, DocumentModel.id == DocumentVersionModel.document_id)
+            .join(ProjectMemberModel, ProjectMemberModel.project_id == DocumentModel.project_id)
+            .where(
+                DocumentVersionModel.id == version_id,
+                ProjectMemberModel.user_id == user_id,
+                DocumentModel.deleted_at.is_(None),
+            )
+        )
+        return to_document_version(row) if row else None
+
+    async def get_version_by_number(
+        self, document_id: UUID, version_number: int, user_id: UUID
+    ) -> DocumentVersion | None:
+        row = await self.session.scalar(
+            select(DocumentVersionModel)
+            .join(DocumentModel, DocumentModel.id == DocumentVersionModel.document_id)
+            .join(ProjectMemberModel, ProjectMemberModel.project_id == DocumentModel.project_id)
+            .where(
+                DocumentVersionModel.document_id == document_id,
+                DocumentVersionModel.version_number == version_number,
+                ProjectMemberModel.user_id == user_id,
+                DocumentModel.deleted_at.is_(None),
+            )
+        )
+        return to_document_version(row) if row else None
+
+    async def list_versions(self, document_id: UUID, user_id: UUID) -> Sequence[DocumentVersion]:
+        rows = (
+            await self.session.scalars(
+                select(DocumentVersionModel)
+                .join(DocumentModel, DocumentModel.id == DocumentVersionModel.document_id)
+                .join(ProjectMemberModel, ProjectMemberModel.project_id == DocumentModel.project_id)
+                .where(
+                    DocumentVersionModel.document_id == document_id,
+                    ProjectMemberModel.user_id == user_id,
+                    DocumentModel.deleted_at.is_(None),
+                )
+                .order_by(DocumentVersionModel.version_number.desc())
+            )
+        ).all()
+        return [to_document_version(row) for row in rows]
