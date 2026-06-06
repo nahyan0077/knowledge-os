@@ -32,9 +32,9 @@
 
 ### Documents
 
-**Status:** Implemented (enhanced with Sprint 6 text extraction and chunking).
+**Status:** Implemented (enhanced with Sprint 6 & 6.1 PDF extraction, token counting, and chunk metadata).
 
-- Responsibilities: upload metadata, logical documents, immutable versions, lifecycle status, plain text extraction, character-based sliding-window chunking, database persistence of document chunks.
+- Responsibilities: upload metadata, logical documents, immutable versions, lifecycle status, PDF and plain text extraction, tiktoken tokenization, sliding-window chunking, database persistence of document chunks with metrics.
 - Public APIs: `POST /projects/{project_id}/documents`, `POST /projects/{project_id}/documents/{document_id}/versions`, `GET /projects/{project_id}/documents`, `GET /documents/{document_id}`, `GET /documents/{document_id}/versions`, `DELETE /documents/{document_id}`.
 - Tables: `documents`, `document_versions`, `document_chunks`.
 - Dependencies: Projects, Blob port.

@@ -18,6 +18,8 @@ dependencies = [
   "pydantic-ai>=1.106.0",
   "sse-starlette>=3.4.4",
   "temporalio>=1.28.0",
+  "pypdf>=5.0.0",
+  "tiktoken>=0.8.0",
 ]
 
 [dependency-groups]

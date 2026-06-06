@@ -162,9 +162,11 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
 
             assert result == {"status": "success"}
 
-            # Assert document version status is updated to indexed
+            # Assert document version status is updated to indexed and metadata is saved
             updated_version = store.versions[version_id]
             assert updated_version.status == DocumentVersionStatus.INDEXED
+            assert updated_version.extracted_characters == 118
+            assert updated_version.page_count is None
 
             # Assert workflow run status is updated to completed
             updated_run = store.workflow_runs[run_id]
@@ -176,6 +178,8 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
             assert len(store.document_chunks) > 0
             assert any(c.content.startswith("Hello world!") for c in store.document_chunks)
             assert all(c.version_id == version_id for c in store.document_chunks)
+            assert all(c.char_count == len(c.content) for c in store.document_chunks)
+            assert all(c.token_count > 0 for c in store.document_chunks)
 
             # Assert events were recorded
             assert len(store.workflow_events) > 0

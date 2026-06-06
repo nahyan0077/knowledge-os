@@ -246,6 +246,8 @@ class DocumentVersionModel(TimestampMixin, Base):
     )
     failure_code: Mapped[str | None] = mapped_column(String(100))
     failure_detail: Mapped[str | None] = mapped_column(Text)
+    extracted_characters: Mapped[int | None] = mapped_column(Integer)
+    page_count: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         UniqueConstraint("document_id", "version_number", name="uq_document_version"),
@@ -413,6 +415,7 @@ class DocumentChunkModel(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     char_offset: Mapped[int] = mapped_column(Integer, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    char_count: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

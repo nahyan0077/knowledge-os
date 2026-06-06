@@ -64,7 +64,7 @@ frontend/src/
 |---|---|---|
 | FastAPI API | Synchronous commands/queries, auth, streaming entry point | Implemented |
 | Next.js web | User interface and browser state | Implemented |
-| Temporal ingestion worker | Document validation, status updates, metadata extraction, plain text extraction, sliding-window chunking | Implemented |
+| Temporal ingestion worker | Document validation, status updates, metadata extraction, PDF and plain text extraction, tiktoken tokenization, sliding-window chunking, metrics calculation | Implemented |
 | Temporal agent worker | Agent and report execution | Planned |
 | PostgreSQL | Business truth and product-facing projections | Implemented |
 | Qdrant | Derived vector index | Planned |

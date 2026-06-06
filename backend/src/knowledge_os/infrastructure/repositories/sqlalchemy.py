@@ -361,6 +361,8 @@ def to_document_version(row: DocumentVersionModel) -> DocumentVersion:
         status=row.status,
         failure_code=row.failure_code,
         failure_detail=row.failure_detail,
+        extracted_characters=row.extracted_characters,
+        page_count=row.page_count,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -448,6 +450,8 @@ class SqlAlchemyDocumentRepository:
                 status=version.status,
                 failure_code=version.failure_code,
                 failure_detail=version.failure_detail,
+                extracted_characters=version.extracted_characters,
+                page_count=version.page_count,
                 created_at=version.created_at,
                 updated_at=version.updated_at,
             )
@@ -464,6 +468,8 @@ class SqlAlchemyDocumentRepository:
                 status=version.status,
                 failure_code=version.failure_code,
                 failure_detail=version.failure_detail,
+                extracted_characters=version.extracted_characters,
+                page_count=version.page_count,
                 updated_at=version.updated_at,
             )
         )
@@ -824,6 +830,7 @@ def to_document_chunk(row: DocumentChunkModel) -> DocumentChunk:
         content=row.content,
         char_offset=row.char_offset,
         token_count=row.token_count,
+        char_count=row.char_count,
         created_at=row.created_at,
     )
 
@@ -844,6 +851,7 @@ class SqlAlchemyDocumentChunkRepository:
                     content=chunk.content,
                     char_offset=chunk.char_offset,
                     token_count=chunk.token_count,
+                    char_count=chunk.char_count,
                     created_at=chunk.created_at,
                 )
             )

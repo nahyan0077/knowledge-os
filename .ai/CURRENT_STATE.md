@@ -71,15 +71,15 @@
   - `GET /api/v1/projects/{project_id}/workflows` (List runs by resource type/ID)
 - **Unit and Integration Tests**: Implemented time-skipping Temporal unit tests and FastAPI route tests; all 45 checks pass.
 
-### Sprint 6 (Transform Document Versions into Searchable Chunks) - Completed
-- **Domain Entities**: Defined `DocumentChunk` and `DocumentChunkRepository` protocol with async CRUD operations.
-- **Text Extraction Layer**: Developed `TextExtractor` supporting UTF-8 plain text decoding, mock PDF parsing, and generic fallback options.
-- **Text Chunking Layer**: Implemented character-based sliding-window `TextChunker` aligned with word boundaries (using rfind spaces) with configurable overlap and estimated token count tracking.
+### Sprint 6 & 6.1 (Document Ingestion Hardening, Text Extraction, and Chunk Metadata) - Completed
+- **Domain Entities**: Defined `DocumentChunk` and `DocumentChunkRepository` protocol with async CRUD operations. Enhanced `DocumentVersion` and `DocumentChunk` to support metrics (`extracted_characters`, `page_count`, and `char_count`).
+- **PDF Extraction Layer**: Replaced mock parsing with `pypdf` page-by-page text extraction. Implemented graceful handling of empty pages and robust recovery from malformed PDFs via `PdfTextExtractor`.
+- **Token Counting**: Implemented model-aware `TokenCounter` utilizing `tiktoken` with default model configuration (`text-embedding-3-small`), replacing word-count approximations.
+- **Ingestion Metrics & Database Schema**: Added `extracted_characters` and `page_count` columns to `document_versions`, and `char_count` to `document_chunks`. Generated and applied Alembic migration `274853379664`.
 - **Temporal Activities & Queues**:
-  - Created `extract_document_text` (running on `document-processing` task queue) to download raw binaries, extract text, and save plain text artifacts to storage (`extracted_text/{version_id}.txt`) as intermediate state, ensuring Temporal payload optimization.
-  - Created `chunk_document` (running on dedicated `chunk-processing` task queue) to fetch the intermediate text, generate chunks, perform idempotent delete-before-insert operations, and commit chunks to PostgreSQL.
-- **Database Schema**: PostgreSQL table `document_chunks` with compound index and unique constraints (`version_id`, `chunk_index`). Created Alembic migration `ccf798388b9c`.
-- **Testing**: Added Postgres integration tests for `DocumentChunkRepository` lifecycle via testcontainers and time-skipping unit tests verifying multi-worker execution and recorded events. 46 tests passing.
+  - Refactored `extract_document_text` (on `document-processing` queue) to compute character/page metadata, save them in the database, and store intermediate plain text files (`extracted_text/{version_id}.txt`) in Blob Storage.
+  - Refactored `chunk_document` (on dedicated `chunk-processing` queue) to construct chunks with exact character count and token count values and commit them idempotently.
+- **Testing**: Added unit tests for PDF extraction, empty/malformed PDF handling, and tiktoken counting. Added integration assertions for chunk metadata persistence in database repositories and workflow execution. All 54 checks passing.
 
 ## Technical Debt & Risks
 - **Blob Storage Cleanup**: Soft-deleting a document currently retains files in Azure Blob Storage. Hard delete logic or automated cleanup workflows are planned for later phases.

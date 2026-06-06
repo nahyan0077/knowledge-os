@@ -134,6 +134,8 @@ class DocumentVersion:
     status: DocumentVersionStatus = DocumentVersionStatus.PENDING_UPLOAD
     failure_code: str | None = None
     failure_detail: str | None = None
+    extracted_characters: int | None = None
+    page_count: int | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
@@ -233,5 +235,6 @@ class DocumentChunk:
     content: str
     char_offset: int
     token_count: int
+    char_count: int
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)

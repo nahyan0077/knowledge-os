@@ -215,19 +215,30 @@ async def extract_document_text(payload: dict[str, Any]) -> dict[str, Any]:
     # 3. Download binary contents
     content_bytes = await storage.download(blob_path)
 
-    # 4. Extract text
-    extracted_text = extractor.extract_text(content_bytes, mime_type)
+    # 4. Extract text with metadata
+    result = extractor.extract_text_with_metadata(content_bytes, mime_type)
+    extracted_text = result.text
 
     # 5. Save/upload extracted text to storage
     extracted_text_path = f"extracted_text/{version_id}.txt"
     await storage.upload(extracted_text_path, extracted_text.encode("utf-8"), "text/plain")
 
-    # 6. Record extraction completed event
+    # 6. Record extraction completed event and save version metadata
     async with SqlAlchemyUnitOfWork() as uow:
+        version = await uow.documents.get_version_by_id(version_id, user_id)
+        if version:
+            version.extracted_characters = result.extracted_characters
+            version.page_count = result.page_count
+            await uow.documents.save_version(version)
+
         event = WorkflowEvent(
             workflow_run_id=workflow_run_id,
             event_type="document_text_extracted",
-            payload={"extracted_text_path": extracted_text_path},
+            payload={
+                "extracted_text_path": extracted_text_path,
+                "extracted_characters": result.extracted_characters,
+                "page_count": result.page_count,
+            },
         )
         await uow.workflow_events.add(event)
         await uow.commit()
@@ -280,6 +291,7 @@ async def chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
             content=c["content"],
             char_offset=c["char_offset"],
             token_count=c["token_count"],
+            char_count=c["char_count"],
         )
         for c in chunks_data
     ]

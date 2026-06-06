@@ -143,6 +143,7 @@ async def test_sqlalchemy_document_chunk_repository_lifecycle(db_session) -> Non
         content="This is chunk 0",
         char_offset=0,
         token_count=4,
+        char_count=15,
     )
     chunk_2 = DocumentChunk(
         organization_id=org_id,
@@ -152,6 +153,7 @@ async def test_sqlalchemy_document_chunk_repository_lifecycle(db_session) -> Non
         content="This is chunk 1",
         char_offset=15,
         token_count=4,
+        char_count=15,
     )
     await chunk_repo.add_batch([chunk_1, chunk_2])
     await db_session.flush()
@@ -163,10 +165,12 @@ async def test_sqlalchemy_document_chunk_repository_lifecycle(db_session) -> Non
     assert chunks[0].content == "This is chunk 0"
     assert chunks[0].char_offset == 0
     assert chunks[0].token_count == 4
+    assert chunks[0].char_count == 15
     assert chunks[1].chunk_index == 1
     assert chunks[1].content == "This is chunk 1"
     assert chunks[1].char_offset == 15
     assert chunks[1].token_count == 4
+    assert chunks[1].char_count == 15
 
     # 3. Delete and Assert
     await chunk_repo.delete_for_version(version_id)
