@@ -79,6 +79,7 @@ class DocumentService:
             document.current_version_id = version.id
 
             await uow.documents.add(document)
+            await uow.flush()
             await uow.documents.add_version(version)
             await uow.commit()
 
