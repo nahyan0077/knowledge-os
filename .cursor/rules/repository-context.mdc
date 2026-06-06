@@ -1,0 +1,13 @@
+---
+description: Knowledge OS repository architecture and engineering rules
+alwaysApply: true
+---
+
+Read `AGENTS.md` and the relevant files under `.ai/` before making changes.
+
+- Distinguish implemented behavior from planned architecture.
+- Preserve tenant isolation and clean architecture dependency direction.
+- Do not implement future domains unless explicitly requested.
+- Update context docs or ADRs when changing durable boundaries.
+- Run `make check` before completing code changes.
+

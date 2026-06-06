@@ -1,0 +1,31 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs and editors (excluding shared .cursor rules)
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Backend environment and caches
+backend/.env
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+backend/src/knowledge_os/__pycache__/
+backend/src/knowledge_os/api/__pycache__/
+backend/src/knowledge_os/api/v1/__pycache__/
+backend/src/knowledge_os/application/__pycache__/
+backend/src/knowledge_os/domain/__pycache__/
+backend/src/knowledge_os/infrastructure/__pycache__/
+backend/src/knowledge_os/infrastructure/database/__pycache__/
+backend/src/knowledge_os/infrastructure/repositories/__pycache__/
+backend/src/knowledge_os/infrastructure/security/__pycache__/
+backend/tests/__pycache__/
+backend/tests/api/__pycache__/
+backend/tests/unit/__pycache__/
+backend/migrations/__pycache__/
+backend/migrations/versions/__pycache__/
