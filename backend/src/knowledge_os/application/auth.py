@@ -63,7 +63,7 @@ class AuthService:
             user = User(
                 email=normalized_email,
                 display_name=clean_name,
-                password_hash=self._passwords.hash(password),
+                password_hash=await self._passwords.hash(password),
             )
             organization = Organization(
                 name=f"{clean_name}'s Workspace",
@@ -90,10 +90,11 @@ class AuthService:
             if (
                 user is None
                 or user.status is not UserStatus.ACTIVE
-                or not self._passwords.verify(password, user.password_hash)
+                or not await self._passwords.verify(password, user.password_hash)
             ):
                 raise AuthenticationError("Invalid email or password", "invalid_credentials")
             user.last_login_at = utc_now()
+            user.updated_at = utc_now()
             await uow.users.save(user)
             organizations = await uow.organizations.list_for_user(user.id)
             result = await self._create_session(

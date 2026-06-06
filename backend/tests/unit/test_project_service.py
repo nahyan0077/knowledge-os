@@ -3,7 +3,11 @@ from uuid import uuid4
 import pytest
 
 from knowledge_os.application.projects import ProjectService
-from knowledge_os.domain.common import AuthorizationError, NotFoundError, ValidationError
+from knowledge_os.domain.common import (
+    AuthorizationError,
+    ConflictError,
+    NotFoundError,
+)
 from knowledge_os.domain.entities import (
     MembershipRole,
     Organization,
@@ -55,7 +59,7 @@ async def test_update_rejects_stale_version() -> None:
     service = make_service(store)
     project = await service.create(organization.id, user.id, "Research", None)
 
-    with pytest.raises(ValidationError) as error:
+    with pytest.raises(ConflictError) as error:
         await service.update(
             project.id, user.id, expected_version=2, name="Changed", description=None
         )

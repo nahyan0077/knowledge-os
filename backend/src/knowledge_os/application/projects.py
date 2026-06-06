@@ -1,7 +1,12 @@
 from collections.abc import Callable, Sequence
 from uuid import UUID
 
-from knowledge_os.domain.common import AuthorizationError, NotFoundError, ValidationError
+from knowledge_os.domain.common import (
+    AuthorizationError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from knowledge_os.domain.entities import MembershipRole, Project, ProjectMembership, utc_now
 from knowledge_os.domain.repositories import UnitOfWork
 
@@ -71,7 +76,7 @@ class ProjectService:
             if role not in {MembershipRole.OWNER, MembershipRole.EDITOR}:
                 raise AuthorizationError("Project write access denied", "project_write_denied")
             if project.version != expected_version:
-                raise ValidationError("Project was modified by another request", "version_conflict")
+                raise ConflictError("Project was modified by another request", "version_conflict")
             if name is not None:
                 project.name = self._validate_name(name)
             if description is not None:

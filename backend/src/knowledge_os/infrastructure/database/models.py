@@ -69,7 +69,11 @@ class RefreshSessionModel(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (Index("ix_refresh_sessions_family_id", "family_id"),)
+    __table_args__ = (
+        Index("ix_refresh_sessions_family_id", "family_id"),
+        Index("ix_refresh_sessions_user_id", "user_id"),
+        Index("ix_refresh_sessions_expires_at", "expires_at"),
+    )
 
 
 class OrganizationModel(TimestampMixin, Base):

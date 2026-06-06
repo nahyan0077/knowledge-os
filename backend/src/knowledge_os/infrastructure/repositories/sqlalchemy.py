@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from knowledge_os.domain.common import ValidationError
+from knowledge_os.domain.common import ConflictError
 from knowledge_os.domain.entities import (
     Organization,
     OrganizationMembership,
@@ -259,7 +259,7 @@ class SqlAlchemyProjectRepository:
             ),
         )
         if result.rowcount != 1:
-            raise ValidationError("Project was modified by another request", "version_conflict")
+            raise ConflictError("Project was modified by another request", "version_conflict")
 
     async def add_membership(self, membership: ProjectMembership) -> None:
         self.session.add(

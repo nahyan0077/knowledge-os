@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import secrets
@@ -15,11 +16,11 @@ class Argon2PasswordService:
     def __init__(self) -> None:
         self._password_hash = PasswordHash.recommended()
 
-    def hash(self, password: str) -> str:
-        return self._password_hash.hash(password)
+    async def hash(self, password: str) -> str:
+        return await asyncio.to_thread(self._password_hash.hash, password)
 
-    def verify(self, password: str, password_hash: str) -> bool:
-        return self._password_hash.verify(password, password_hash)
+    async def verify(self, password: str, password_hash: str) -> bool:
+        return await asyncio.to_thread(self._password_hash.verify, password, password_hash)
 
 
 class JwtAccessTokenService:

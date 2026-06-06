@@ -1,19 +1,19 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from knowledge_os.domain.entities import Organization, Project, User
 
 
 class RegisterRequest(BaseModel):
-    email: str = Field(max_length=320)
+    email: EmailStr = Field(max_length=320)
     display_name: str = Field(min_length=1, max_length=160)
     password: str = Field(min_length=12, max_length=256)
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(max_length=320)
+    email: EmailStr = Field(max_length=320)
     password: str = Field(max_length=256)
 
 

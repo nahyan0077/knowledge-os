@@ -97,12 +97,20 @@ class ProjectRepo:
         self.store.projects[project.id] = project
 
     async def save(self, project: Project) -> None:
+        current = self.store.projects.get(project.id)
+        if current is not None:
+            if current.version != project.version - 1:
+                from knowledge_os.domain.common import ConflictError
+
+                raise ConflictError("Project was modified by another request", "version_conflict")
         self.store.projects[project.id] = project
 
     async def add_membership(self, membership: ProjectMembership) -> None:
         self.store.project_memberships.append(membership)
 
     async def get_for_user(self, project_id: UUID, user_id: UUID) -> Project | None:
+        import copy
+
         project = self.store.projects.get(project_id)
         if project is None or project.deleted_at is not None:
             return None
@@ -110,16 +118,18 @@ class ProjectRepo:
             item.project_id == project_id and item.user_id == user_id
             for item in self.store.project_memberships
         )
-        return project if allowed else None
+        return copy.deepcopy(project) if allowed else None
 
     async def list_for_user(
         self, organization_id: UUID, user_id: UUID, limit: int
     ) -> Sequence[Project]:
+        import copy
+
         project_ids = {
             item.project_id for item in self.store.project_memberships if item.user_id == user_id
         }
         return [
-            item
+            copy.deepcopy(item)
             for item in self.store.projects.values()
             if item.organization_id == organization_id
             and item.id in project_ids
@@ -158,11 +168,11 @@ class FakeUnitOfWork:
 
 
 class FakePasswordService:
-    def hash(self, password: str) -> str:
+    async def hash(self, password: str) -> str:
         return f"hashed:{password}"
 
-    def verify(self, password: str, password_hash: str) -> bool:
-        return password_hash == self.hash(password)
+    async def verify(self, password: str, password_hash: str) -> bool:
+        return password_hash == await self.hash(password)
 
 
 class FakeAccessTokenService:
