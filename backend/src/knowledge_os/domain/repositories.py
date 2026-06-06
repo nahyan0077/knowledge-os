@@ -5,6 +5,7 @@ from uuid import UUID
 from knowledge_os.domain.entities import (
     Conversation,
     Document,
+    DocumentChunk,
     DocumentVersion,
     LlmUsage,
     Message,
@@ -106,6 +107,12 @@ class WorkflowEventRepository(Protocol):
     async def list_for_run(self, workflow_run_id: UUID) -> Sequence[WorkflowEvent]: ...
 
 
+class DocumentChunkRepository(Protocol):
+    async def add_batch(self, chunks: Sequence[DocumentChunk]) -> None: ...
+    async def list_for_version(self, version_id: UUID) -> Sequence[DocumentChunk]: ...
+    async def delete_for_version(self, version_id: UUID) -> None: ...
+
+
 class UnitOfWork(Protocol):
     users: UserRepository
     organizations: OrganizationRepository
@@ -116,6 +123,7 @@ class UnitOfWork(Protocol):
     llm_usage: LlmUsageRepository
     workflow_runs: WorkflowRunRepository
     workflow_events: WorkflowEventRepository
+    document_chunks: DocumentChunkRepository
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...

@@ -222,3 +222,16 @@ class WorkflowEvent:
     payload: dict[str, Any] = field(default_factory=dict)
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(slots=True)
+class DocumentChunk:
+    organization_id: UUID
+    document_id: UUID
+    version_id: UUID
+    chunk_index: int
+    content: str
+    char_offset: int
+    token_count: int
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)

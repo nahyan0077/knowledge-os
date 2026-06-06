@@ -11,6 +11,7 @@ from knowledge_os.domain.common import ConflictError
 from knowledge_os.domain.entities import (
     Conversation,
     Document,
+    DocumentChunk,
     DocumentVersion,
     LlmUsage,
     Message,
@@ -25,6 +26,7 @@ from knowledge_os.domain.entities import (
 )
 from knowledge_os.infrastructure.database.models import (
     ConversationModel,
+    DocumentChunkModel,
     DocumentModel,
     DocumentVersionModel,
     LlmUsageModel,
@@ -810,3 +812,55 @@ class SqlAlchemyWorkflowEventRepository:
             )
         ).all()
         return [to_workflow_event(row) for row in rows]
+
+
+def to_document_chunk(row: DocumentChunkModel) -> DocumentChunk:
+    return DocumentChunk(
+        id=row.id,
+        organization_id=row.organization_id,
+        document_id=row.document_id,
+        version_id=row.version_id,
+        chunk_index=row.chunk_index,
+        content=row.content,
+        char_offset=row.char_offset,
+        token_count=row.token_count,
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyDocumentChunkRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add_batch(self, chunks: Sequence[DocumentChunk]) -> None:
+        for chunk in chunks:
+            self.session.add(
+                DocumentChunkModel(
+                    id=chunk.id,
+                    organization_id=chunk.organization_id,
+                    document_id=chunk.document_id,
+                    version_id=chunk.version_id,
+                    chunk_index=chunk.chunk_index,
+                    content=chunk.content,
+                    char_offset=chunk.char_offset,
+                    token_count=chunk.token_count,
+                    created_at=chunk.created_at,
+                )
+            )
+
+    async def list_for_version(self, version_id: UUID) -> Sequence[DocumentChunk]:
+        rows = (
+            await self.session.scalars(
+                select(DocumentChunkModel)
+                .where(DocumentChunkModel.version_id == version_id)
+                .order_by(DocumentChunkModel.chunk_index.asc())
+            )
+        ).all()
+        return [to_document_chunk(row) for row in rows]
+
+    async def delete_for_version(self, version_id: UUID) -> None:
+        from sqlalchemy import delete
+
+        await self.session.execute(
+            delete(DocumentChunkModel).where(DocumentChunkModel.version_id == version_id)
+        )

@@ -45,7 +45,28 @@ class DocumentProcessingWorkflow:
                 retry_policy=retry_policy,
             )
 
-            # 4. Update status to "indexed" representing successful pipeline processing completion
+            # 4. Extract Document Text
+            extraction_result = await workflow.execute_activity(
+                "extract_document_text",
+                payload,
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=retry_policy,
+            )
+
+            # 5. Chunk Document (Runs on the chunk-processing task queue)
+            chunking_payload = {
+                **payload,
+                "extracted_text_path": extraction_result["extracted_text_path"],
+            }
+            await workflow.execute_activity(
+                "chunk_document",
+                chunking_payload,
+                start_to_close_timeout=timedelta(minutes=10),
+                retry_policy=retry_policy,
+                task_queue="chunk-processing",
+            )
+
+            # 6. Update status to "indexed" representing successful pipeline processing completion
             indexed_payload = {**payload, "status": "indexed"}
             await workflow.execute_activity(
                 "update_document_status",
@@ -54,7 +75,7 @@ class DocumentProcessingWorkflow:
                 retry_policy=retry_policy,
             )
 
-            # 5. Finalize workflow run as completed
+            # 7. Finalize workflow run as completed
             finalize_payload = {
                 "workflow_run_id": workflow_run_id,
                 "status": "completed",

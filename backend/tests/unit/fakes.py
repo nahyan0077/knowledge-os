@@ -11,6 +11,7 @@ from knowledge_os.application.ports import (
 from knowledge_os.domain.entities import (
     Conversation,
     Document,
+    DocumentChunk,
     DocumentVersion,
     LlmUsage,
     Message,
@@ -41,6 +42,7 @@ class Store:
     llm_usage: dict[UUID, LlmUsage] = field(default_factory=dict)
     workflow_runs: dict[UUID, WorkflowRun] = field(default_factory=dict)
     workflow_events: list[WorkflowEvent] = field(default_factory=list)
+    document_chunks: list[DocumentChunk] = field(default_factory=list)
 
 
 class UserRepo:
@@ -430,6 +432,26 @@ class FakeWorkflowEventRepository:
         return [copy.deepcopy(e) for e in events]
 
 
+class FakeDocumentChunkRepository:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+
+    async def add_batch(self, chunks: Sequence[DocumentChunk]) -> None:
+        self.store.document_chunks.extend(chunks)
+
+    async def list_for_version(self, version_id: UUID) -> Sequence[DocumentChunk]:
+        import copy
+
+        chunks = [c for c in self.store.document_chunks if c.version_id == version_id]
+        chunks.sort(key=lambda x: x.chunk_index)
+        return [copy.deepcopy(c) for c in chunks]
+
+    async def delete_for_version(self, version_id: UUID) -> None:
+        self.store.document_chunks = [
+            c for c in self.store.document_chunks if c.version_id != version_id
+        ]
+
+
 class FakeUnitOfWork:
     def __init__(self, store: Store) -> None:
         self.store = store
@@ -442,6 +464,7 @@ class FakeUnitOfWork:
         self.llm_usage = LlmUsageRepo(store)
         self.workflow_runs = FakeWorkflowRunRepository(store)
         self.workflow_events = FakeWorkflowEventRepository(store)
+        self.document_chunks = FakeDocumentChunkRepository(store)
         self.commits = 0
 
     async def __aenter__(self) -> "FakeUnitOfWork":

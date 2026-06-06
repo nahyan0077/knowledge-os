@@ -19,7 +19,9 @@ from knowledge_os.domain.entities import (
     WorkflowRunStatus,
 )
 from knowledge_os.infrastructure.workflows.activities import (
+    chunk_document,
     extract_document_metadata,
+    extract_document_text,
     finalize_workflow_run,
     update_document_status,
     validate_document,
@@ -94,6 +96,20 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
     )
     store.workflow_runs[run_id] = run
 
+    # Pre-upload mock document text to local storage fallback
+    from knowledge_os.config import get_settings
+    from knowledge_os.infrastructure.storage.azure import AzureBlobStorageAdapter
+
+    storage = AzureBlobStorageAdapter(get_settings())
+    await storage.upload(
+        "test_blob",
+        (
+            b"Hello world! This is a test file for chunking. "
+            b"It contains multiple sentences to check if the chunker works correctly."
+        ),
+        "text/plain",
+    )
+
     # Monkeypatch SqlAlchemyUnitOfWork to use FakeUnitOfWork
     from knowledge_os.infrastructure.workflows import activities
 
@@ -105,17 +121,29 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
 
     # Start local in-memory temporal server
     async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
+        doc_worker = Worker(
             env.client,
             task_queue="test-task-queue",
             workflows=[DocumentProcessingWorkflow],
             activities=[
                 validate_document,
                 extract_document_metadata,
+                extract_document_text,
                 update_document_status,
                 finalize_workflow_run,
             ],
-        ):
+        )
+
+        chunk_worker = Worker(
+            env.client,
+            task_queue="chunk-processing",
+            workflows=[],
+            activities=[
+                chunk_document,
+            ],
+        )
+
+        async with doc_worker, chunk_worker:
             payload = {
                 "organization_id": str(org_id),
                 "project_id": str(project_id),
@@ -144,12 +172,21 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
             assert updated_run.completed_at is not None
             assert updated_run.error_message is None
 
+            # Assert chunks were created and persisted correctly
+            assert len(store.document_chunks) > 0
+            assert any(c.content.startswith("Hello world!") for c in store.document_chunks)
+            assert all(c.version_id == version_id for c in store.document_chunks)
+
             # Assert events were recorded
             assert len(store.workflow_events) > 0
             event_types = [e.event_type for e in store.workflow_events]
             assert "document_validation_started" in event_types
             assert "document_validation_completed" in event_types
             assert "metadata_extraction_completed" in event_types
+            assert "document_extraction_started" in event_types
+            assert "document_text_extracted" in event_types
+            assert "document_chunking_started" in event_types
+            assert "document_chunking_completed" in event_types
             assert "workflow_finalized" in event_types
 
 
@@ -205,17 +242,29 @@ async def test_document_processing_workflow_validation_failure(monkeypatch: pyte
     )
 
     async with await WorkflowEnvironment.start_time_skipping() as env:
-        async with Worker(
+        doc_worker = Worker(
             env.client,
             task_queue="test-task-queue",
             workflows=[DocumentProcessingWorkflow],
             activities=[
                 validate_document,
                 extract_document_metadata,
+                extract_document_text,
                 update_document_status,
                 finalize_workflow_run,
             ],
-        ):
+        )
+
+        chunk_worker = Worker(
+            env.client,
+            task_queue="chunk-processing",
+            workflows=[],
+            activities=[
+                chunk_document,
+            ],
+        )
+
+        async with doc_worker, chunk_worker:
             payload = {
                 "organization_id": str(org_id),
                 "project_id": str(project_id),

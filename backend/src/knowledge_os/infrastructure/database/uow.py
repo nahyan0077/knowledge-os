@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from knowledge_os.domain.repositories import (
     ConversationRepository,
+    DocumentChunkRepository,
     DocumentRepository,
     LlmUsageRepository,
     OrganizationRepository,
@@ -14,6 +15,7 @@ from knowledge_os.domain.repositories import (
 from knowledge_os.infrastructure.database.session import session_factory
 from knowledge_os.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyConversationRepository,
+    SqlAlchemyDocumentChunkRepository,
     SqlAlchemyDocumentRepository,
     SqlAlchemyLlmUsageRepository,
     SqlAlchemyOrganizationRepository,
@@ -35,6 +37,7 @@ class SqlAlchemyUnitOfWork:
     llm_usage: LlmUsageRepository
     workflow_runs: WorkflowRunRepository
     workflow_events: WorkflowEventRepository
+    document_chunks: DocumentChunkRepository
 
     def __init__(self) -> None:
         self.session: AsyncSession | None = None
@@ -50,6 +53,7 @@ class SqlAlchemyUnitOfWork:
         self.llm_usage = SqlAlchemyLlmUsageRepository(self.session)
         self.workflow_runs = SqlAlchemyWorkflowRunRepository(self.session)
         self.workflow_events = SqlAlchemyWorkflowEventRepository(self.session)
+        self.document_chunks = SqlAlchemyDocumentChunkRepository(self.session)
         return self
 
     async def __aexit__(

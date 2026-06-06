@@ -71,9 +71,19 @@
   - `GET /api/v1/projects/{project_id}/workflows` (List runs by resource type/ID)
 - **Unit and Integration Tests**: Implemented time-skipping Temporal unit tests and FastAPI route tests; all 45 checks pass.
 
+### Sprint 6 (Transform Document Versions into Searchable Chunks) - Completed
+- **Domain Entities**: Defined `DocumentChunk` and `DocumentChunkRepository` protocol with async CRUD operations.
+- **Text Extraction Layer**: Developed `TextExtractor` supporting UTF-8 plain text decoding, mock PDF parsing, and generic fallback options.
+- **Text Chunking Layer**: Implemented character-based sliding-window `TextChunker` aligned with word boundaries (using rfind spaces) with configurable overlap and estimated token count tracking.
+- **Temporal Activities & Queues**:
+  - Created `extract_document_text` (running on `document-processing` task queue) to download raw binaries, extract text, and save plain text artifacts to storage (`extracted_text/{version_id}.txt`) as intermediate state, ensuring Temporal payload optimization.
+  - Created `chunk_document` (running on dedicated `chunk-processing` task queue) to fetch the intermediate text, generate chunks, perform idempotent delete-before-insert operations, and commit chunks to PostgreSQL.
+- **Database Schema**: PostgreSQL table `document_chunks` with compound index and unique constraints (`version_id`, `chunk_index`). Created Alembic migration `ccf798388b9c`.
+- **Testing**: Added Postgres integration tests for `DocumentChunkRepository` lifecycle via testcontainers and time-skipping unit tests verifying multi-worker execution and recorded events. 46 tests passing.
+
 ## Technical Debt & Risks
 - **Blob Storage Cleanup**: Soft-deleting a document currently retains files in Azure Blob Storage. Hard delete logic or automated cleanup workflows are planned for later phases.
 - **Docker Dependency**: Integration tests require Docker daemon to run.
 
 ## Next Steps
-- Implement Sprint 6 (Retrieval & Grounding / Qdrant & Embeddings / RAG integration).
+- Implement Sprint 7 (Embeddings & Vector Search / Qdrant / RAG Integration).

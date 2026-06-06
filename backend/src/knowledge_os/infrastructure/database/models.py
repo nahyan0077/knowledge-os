@@ -394,3 +394,31 @@ class WorkflowEventModel(Base):
     )
 
     __table_args__ = (Index("ix_workflow_events_run_id", "workflow_run_id"),)
+
+
+class DocumentChunkModel(Base):
+    __tablename__ = "document_chunks"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    version_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("document_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    char_offset: Mapped[int] = mapped_column(Integer, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("version_id", "chunk_index", name="uq_document_chunk_version_index"),
+        Index("ix_document_chunks_org_doc", "organization_id", "document_id"),
+        Index("ix_document_chunks_version_id", "version_id"),
+    )
