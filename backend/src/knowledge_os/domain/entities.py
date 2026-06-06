@@ -137,3 +137,31 @@ class DocumentVersion:
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
+
+
+class MessageRole(StrEnum):
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+@dataclass(slots=True)
+class Conversation:
+    organization_id: UUID
+    project_id: UUID
+    title: str
+    created_by: UUID
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+    deleted_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class Message:
+    conversation_id: UUID
+    role: MessageRole
+    content: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)

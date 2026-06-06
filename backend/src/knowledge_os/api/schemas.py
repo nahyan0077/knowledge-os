@@ -1,9 +1,18 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from knowledge_os.domain.entities import Document, DocumentVersion, Organization, Project, User
+from knowledge_os.domain.entities import (
+    Conversation,
+    Document,
+    DocumentVersion,
+    Message,
+    Organization,
+    Project,
+    User,
+)
 
 
 class RegisterRequest(BaseModel):
@@ -154,3 +163,68 @@ class DocumentVersionResponse(BaseModel):
             created_at=ver.created_at,
             updated_at=ver.updated_at,
         )
+
+
+class ConversationCreateRequest(BaseModel):
+    organization_id: UUID
+    title: str = Field(min_length=1, max_length=255)
+
+
+class ConversationRenameRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+
+
+class ConversationResponse(BaseModel):
+    id: UUID
+    organization_id: UUID
+    project_id: UUID
+    title: str
+    created_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, conv: Conversation) -> "ConversationResponse":
+        return cls(
+            id=conv.id,
+            organization_id=conv.organization_id,
+            project_id=conv.project_id,
+            title=conv.title,
+            created_by=conv.created_by,
+            created_at=conv.created_at,
+            updated_at=conv.updated_at,
+        )
+
+
+class ConversationListResponse(BaseModel):
+    items: list[ConversationResponse]
+
+
+class MessageAddRequest(BaseModel):
+    role: str = Field(min_length=1, max_length=50)
+    content: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MessageResponse(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    role: str
+    content: str
+    metadata: dict[str, Any]
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, msg: Message) -> "MessageResponse":
+        return cls(
+            id=msg.id,
+            conversation_id=msg.conversation_id,
+            role=msg.role.value,
+            content=msg.content,
+            metadata=msg.metadata,
+            created_at=msg.created_at,
+        )
+
+
+class MessageListResponse(BaseModel):
+    items: list[MessageResponse]

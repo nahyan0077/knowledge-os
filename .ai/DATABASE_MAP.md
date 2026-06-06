@@ -22,6 +22,9 @@ erDiagram
     PROJECTS ||--o{ DOCUMENTS : owns
     DOCUMENTS ||--o{ DOCUMENT_VERSIONS : has
     USERS ||--o{ DOCUMENTS : creates
+    PROJECTS ||--o{ CONVERSATIONS : owns
+    CONVERSATIONS ||--o{ MESSAGES : has
+    USERS ||--o{ CONVERSATIONS : creates
 ```
 
 ## Implemented Tables
@@ -36,6 +39,8 @@ erDiagram
 | `project_members` | User-to-project roles | Organization and project |
 | `documents` | Logical document metadata, soft deletion | Organization and project |
 | `document_versions` | Immutable document versions, blob references, status | Organization and document |
+| `conversations` | Conversation metadata, soft deletion | Organization and project |
+| `messages` | Chat history messages, role, content, metadata | Conversation |
 
 Critical integrity rules:
 
@@ -51,7 +56,7 @@ Critical integrity rules:
 | Domain | Tables |
 |---|---|
 | Knowledge | `chunks`, `knowledge_entries`, `index_manifests` |
-| Conversations | `conversations`, `messages`, `message_citations` |
+| Conversations | `message_citations` |
 | Agents | `agent_runs`, `agent_run_steps` |
 | Reports | `reports` |
 | Workflows | `workflow_runs`, `outbox_events` |

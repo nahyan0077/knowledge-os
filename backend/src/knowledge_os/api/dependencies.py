@@ -6,6 +6,7 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from knowledge_os.application.auth import AuthService
+from knowledge_os.application.conversations import ConversationService
 from knowledge_os.application.documents import DocumentService
 from knowledge_os.application.projects import ProjectService
 from knowledge_os.config import Settings, get_settings
@@ -50,6 +51,10 @@ def get_document_service(
     storage: Annotated[AzureBlobStorageAdapter, Depends(get_blob_storage_service)],
 ) -> DocumentService:
     return DocumentService(uow_factory=get_uow, storage=storage)
+
+
+def get_conversation_service() -> ConversationService:
+    return ConversationService(uow_factory=get_uow)
 
 
 def get_access_token_service(

@@ -3,8 +3,10 @@ from typing import Protocol
 from uuid import UUID
 
 from knowledge_os.domain.entities import (
+    Conversation,
     Document,
     DocumentVersion,
+    Message,
     Organization,
     OrganizationMembership,
     Project,
@@ -68,12 +70,25 @@ class DocumentRepository(Protocol):
     ) -> Sequence[DocumentVersion]: ...
 
 
+class ConversationRepository(Protocol):
+    async def add(self, conversation: Conversation) -> None: ...
+    async def save(self, conversation: Conversation) -> None: ...
+    async def get_by_id(self, conversation_id: UUID, user_id: UUID) -> Conversation | None: ...
+    async def list_for_project(
+        self, organization_id: UUID, project_id: UUID, user_id: UUID, limit: int
+    ) -> Sequence[Conversation]: ...
+
+    async def add_message(self, message: Message) -> None: ...
+    async def list_messages(self, conversation_id: UUID, user_id: UUID) -> Sequence[Message]: ...
+
+
 class UnitOfWork(Protocol):
     users: UserRepository
     organizations: OrganizationRepository
     refresh_sessions: RefreshSessionRepository
     projects: ProjectRepository
     documents: DocumentRepository
+    conversations: ConversationRepository
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...

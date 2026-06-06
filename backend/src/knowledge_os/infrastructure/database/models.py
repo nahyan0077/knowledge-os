@@ -23,6 +23,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from knowledge_os.domain.entities import (
     DocumentVersionStatus,
     MembershipRole,
+    MessageRole,
     OrganizationType,
     UserStatus,
 )
@@ -248,3 +249,52 @@ class DocumentVersionModel(TimestampMixin, Base):
         Index("ix_document_versions_org_status", "organization_id", "status"),
         Index("ix_document_versions_sha256", "organization_id", "sha256"),
     )
+
+
+class ConversationModel(TimestampMixin, Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_by: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "project_id"],
+            ["projects.organization_id", "projects.id"],
+            name="fk_conversations_tenant_project",
+            ondelete="CASCADE",
+        ),
+        Index("ix_conversations_org_project", "organization_id", "project_id"),
+    )
+
+
+class MessageModel(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[MessageRole] = mapped_column(
+        Enum(
+            MessageRole,
+            name="message_role",
+            values_callable=lambda e: [x.value for x in e],
+        ),
+        nullable=False,
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_messages_conversation_id", "conversation_id"),)

@@ -42,12 +42,12 @@
 
 ### Conversations
 
-**Status:** Planned.
+**Status:** Implemented for Sprint 3.
 
-- Responsibilities: persistent conversations, ordered messages, citations, context summaries.
-- Public APIs: conversation CRUD, message history, submit message/stream response.
-- Tables: `conversations`, `messages`, `message_citations`.
-- Dependencies: Projects, Retrieval public interface, Chat Agent policy.
+- Responsibilities: persistent conversations, ordered messages, lifecycle metadata.
+- Public APIs: `POST /projects/{project_id}/conversations`, `GET /projects/{project_id}/conversations`, `GET /conversations/{conversation_id}`, `PATCH /conversations/{conversation_id}`, `DELETE /conversations/{conversation_id}`, `POST /conversations/{conversation_id}/messages`, `GET /conversations/{conversation_id}/messages`.
+- Tables: `conversations`, `messages`.
+- Dependencies: Projects.
 - Must not access: raw provider SDKs, document persistence internals, workflow storage.
 
 ### Retrieval

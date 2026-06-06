@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from knowledge_os.domain.repositories import (
+    ConversationRepository,
     DocumentRepository,
     OrganizationRepository,
     ProjectRepository,
@@ -9,6 +10,7 @@ from knowledge_os.domain.repositories import (
 )
 from knowledge_os.infrastructure.database.session import session_factory
 from knowledge_os.infrastructure.repositories.sqlalchemy import (
+    SqlAlchemyConversationRepository,
     SqlAlchemyDocumentRepository,
     SqlAlchemyOrganizationRepository,
     SqlAlchemyProjectRepository,
@@ -23,6 +25,7 @@ class SqlAlchemyUnitOfWork:
     refresh_sessions: RefreshSessionRepository
     projects: ProjectRepository
     documents: DocumentRepository
+    conversations: ConversationRepository
 
     def __init__(self) -> None:
         self.session: AsyncSession | None = None
@@ -34,6 +37,7 @@ class SqlAlchemyUnitOfWork:
         self.refresh_sessions = SqlAlchemyRefreshSessionRepository(self.session)
         self.projects = SqlAlchemyProjectRepository(self.session)
         self.documents = SqlAlchemyDocumentRepository(self.session)
+        self.conversations = SqlAlchemyConversationRepository(self.session)
         return self
 
     async def __aexit__(

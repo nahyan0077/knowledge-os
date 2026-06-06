@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from knowledge_os.domain.common import ConflictError
 from knowledge_os.domain.entities import (
+    Conversation,
     Document,
     DocumentVersion,
+    Message,
     Organization,
     OrganizationMembership,
     Project,
@@ -19,8 +21,10 @@ from knowledge_os.domain.entities import (
     User,
 )
 from knowledge_os.infrastructure.database.models import (
+    ConversationModel,
     DocumentModel,
     DocumentVersionModel,
+    MessageModel,
     OrganizationMemberModel,
     OrganizationModel,
     ProjectMemberModel,
@@ -500,3 +504,125 @@ class SqlAlchemyDocumentRepository:
             )
         ).all()
         return [to_document_version(row) for row in rows]
+
+
+def to_conversation(row: ConversationModel) -> Conversation:
+    return Conversation(
+        id=row.id,
+        organization_id=row.organization_id,
+        project_id=row.project_id,
+        title=row.title,
+        created_by=row.created_by,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        deleted_at=row.deleted_at,
+    )
+
+
+def to_message(row: MessageModel) -> Message:
+    return Message(
+        id=row.id,
+        conversation_id=row.conversation_id,
+        role=row.role,
+        content=row.content,
+        metadata=row.meta,
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyConversationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add(self, conversation: Conversation) -> None:
+        self.session.add(
+            ConversationModel(
+                id=conversation.id,
+                organization_id=conversation.organization_id,
+                project_id=conversation.project_id,
+                title=conversation.title,
+                created_by=conversation.created_by,
+                created_at=conversation.created_at,
+                updated_at=conversation.updated_at,
+                deleted_at=conversation.deleted_at,
+            )
+        )
+
+    async def save(self, conversation: Conversation) -> None:
+        await self.session.execute(
+            update(ConversationModel)
+            .where(
+                ConversationModel.id == conversation.id,
+                ConversationModel.organization_id == conversation.organization_id,
+            )
+            .values(
+                title=conversation.title,
+                deleted_at=conversation.deleted_at,
+                updated_at=conversation.updated_at,
+            )
+        )
+
+    async def get_by_id(self, conversation_id: UUID, user_id: UUID) -> Conversation | None:
+        row = await self.session.scalar(
+            select(ConversationModel)
+            .join(ProjectMemberModel, ProjectMemberModel.project_id == ConversationModel.project_id)
+            .where(
+                ConversationModel.id == conversation_id,
+                ProjectMemberModel.user_id == user_id,
+                ConversationModel.deleted_at.is_(None),
+            )
+        )
+        return to_conversation(row) if row else None
+
+    async def list_for_project(
+        self, organization_id: UUID, project_id: UUID, user_id: UUID, limit: int
+    ) -> Sequence[Conversation]:
+        rows = (
+            await self.session.scalars(
+                select(ConversationModel)
+                .join(
+                    ProjectMemberModel,
+                    ProjectMemberModel.project_id == ConversationModel.project_id,
+                )
+                .where(
+                    ConversationModel.organization_id == organization_id,
+                    ConversationModel.project_id == project_id,
+                    ProjectMemberModel.user_id == user_id,
+                    ConversationModel.deleted_at.is_(None),
+                )
+                .order_by(ConversationModel.updated_at.desc())
+                .limit(limit)
+            )
+        ).all()
+        return [to_conversation(row) for row in rows]
+
+    async def add_message(self, message: Message) -> None:
+        self.session.add(
+            MessageModel(
+                id=message.id,
+                conversation_id=message.conversation_id,
+                role=message.role,
+                content=message.content,
+                meta=message.metadata,
+                created_at=message.created_at,
+            )
+        )
+
+    async def list_messages(self, conversation_id: UUID, user_id: UUID) -> Sequence[Message]:
+        rows = (
+            await self.session.scalars(
+                select(MessageModel)
+                .join(ConversationModel, ConversationModel.id == MessageModel.conversation_id)
+                .join(
+                    ProjectMemberModel,
+                    ProjectMemberModel.project_id == ConversationModel.project_id,
+                )
+                .where(
+                    MessageModel.conversation_id == conversation_id,
+                    ProjectMemberModel.user_id == user_id,
+                    ConversationModel.deleted_at.is_(None),
+                )
+                .order_by(MessageModel.created_at.asc())
+            )
+        ).all()
+        return [to_message(row) for row in rows]

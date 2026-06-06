@@ -3,8 +3,10 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from knowledge_os.domain.entities import (
+    Conversation,
     Document,
     DocumentVersion,
+    Message,
     Organization,
     OrganizationMembership,
     Project,
@@ -25,6 +27,8 @@ class Store:
     project_memberships: list[ProjectMembership] = field(default_factory=list)
     documents: dict[UUID, Document] = field(default_factory=dict)
     versions: dict[UUID, DocumentVersion] = field(default_factory=dict)
+    conversations: dict[UUID, Conversation] = field(default_factory=dict)
+    messages: list[Message] = field(default_factory=list)
 
 
 class UserRepo:
@@ -261,6 +265,76 @@ class DocumentRepo:
         )
 
 
+class ConversationRepo:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+
+    async def add(self, conversation: Conversation) -> None:
+        self.store.conversations[conversation.id] = conversation
+
+    async def save(self, conversation: Conversation) -> None:
+        self.store.conversations[conversation.id] = conversation
+
+    async def get_by_id(self, conversation_id: UUID, user_id: UUID) -> Conversation | None:
+        import copy
+
+        conv = self.store.conversations.get(conversation_id)
+        if conv is None or conv.deleted_at is not None:
+            return None
+        allowed = any(
+            item.project_id == conv.project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        return copy.deepcopy(conv) if allowed else None
+
+    async def list_for_project(
+        self, organization_id: UUID, project_id: UUID, user_id: UUID, limit: int
+    ) -> Sequence[Conversation]:
+        import copy
+
+        allowed = any(
+            item.project_id == project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        if not allowed:
+            return []
+        return sorted(
+            [
+                copy.deepcopy(conv)
+                for conv in self.store.conversations.values()
+                if conv.organization_id == organization_id
+                and conv.project_id == project_id
+                and conv.deleted_at is None
+            ],
+            key=lambda x: x.updated_at,
+            reverse=True,
+        )[:limit]
+
+    async def add_message(self, message: Message) -> None:
+        self.store.messages.append(message)
+
+    async def list_messages(self, conversation_id: UUID, user_id: UUID) -> Sequence[Message]:
+        import copy
+
+        conv = self.store.conversations.get(conversation_id)
+        if conv is None or conv.deleted_at is not None:
+            return []
+        allowed = any(
+            item.project_id == conv.project_id and item.user_id == user_id
+            for item in self.store.project_memberships
+        )
+        if not allowed:
+            return []
+        return sorted(
+            [
+                copy.deepcopy(msg)
+                for msg in self.store.messages
+                if msg.conversation_id == conversation_id
+            ],
+            key=lambda x: x.created_at,
+        )
+
+
 class FakeUnitOfWork:
     def __init__(self, store: Store) -> None:
         self.store = store
@@ -269,6 +343,7 @@ class FakeUnitOfWork:
         self.refresh_sessions = SessionRepo(store)
         self.projects = ProjectRepo(store)
         self.documents = DocumentRepo(store)
+        self.conversations = ConversationRepo(store)
         self.commits = 0
 
     async def __aenter__(self) -> "FakeUnitOfWork":

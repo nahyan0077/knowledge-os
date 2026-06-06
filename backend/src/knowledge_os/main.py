@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from knowledge_os.api.v1.auth import router as auth_router
+from knowledge_os.api.v1.conversations import router as conversations_router
 from knowledge_os.api.v1.documents import router as documents_router
 from knowledge_os.api.v1.projects import router as projects_router
 from knowledge_os.config import get_settings
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(projects_router, prefix="/api/v1")
     app.include_router(documents_router, prefix="/api/v1")
+    app.include_router(conversations_router, prefix="/api/v1")
 
     @app.get("/health", tags=["operations"])
     async def health() -> dict[str, str]:
