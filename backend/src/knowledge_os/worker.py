@@ -20,6 +20,17 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main() -> None:
+    logging.info("Verifying infrastructure services...")
+    from knowledge_os.config import get_settings
+    from knowledge_os.infrastructure.verification import verify_infrastructure_services
+
+    settings = get_settings()
+    try:
+        await verify_infrastructure_services(settings)
+    except Exception as exc:
+        logging.error(f"Infrastructure verification failed: {exc}")
+        sys.exit(1)
+
     logging.info("Starting Temporal Workers...")
     try:
         client = await get_temporal_client()
