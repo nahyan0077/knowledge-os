@@ -3,18 +3,21 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any
 from uuid import UUID
 
+from knowledge_os.application.context_builder import ContextBuilder
 from knowledge_os.application.ports import (
     ChatAgentPort,
     LlmModelConfig,
     LlmResponseChunk,
     LlmUsageMetrics,
 )
+from knowledge_os.application.retrieval import RetrievalService
 from knowledge_os.domain.common import (
     AuthorizationError,
     NotFoundError,
     ValidationError,
 )
 from knowledge_os.domain.entities import (
+    Citation,
     Conversation,
     LlmUsage,
     MembershipRole,
@@ -31,9 +34,13 @@ class ConversationService:
         self,
         uow_factory: Callable[[], UnitOfWork],
         chat_agent: ChatAgentPort | None = None,
+        retrieval_service: RetrievalService | None = None,
+        context_builder: ContextBuilder | None = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._chat_agent = chat_agent
+        self._retrieval_service = retrieval_service
+        self._context_builder = context_builder
 
     async def create(
         self,
@@ -224,7 +231,29 @@ class ConversationService:
             (msg.role.value, msg.content) for msg in history if msg.id != assistant_msg.id
         ]
 
-        system_prompt = "You are a helpful assistant."
+        # RAG Context retrieval
+        context_text = ""
+        citations: list[Citation] = []
+        if self._retrieval_service and self._context_builder:
+            retrieved = await self._retrieval_service.search(
+                project_id=conversation.project_id,
+                user_id=user_id,
+                query=content.strip(),
+                top_k=20,
+            )
+            context_text, citations = self._context_builder.build_context(retrieved)
+
+        if context_text:
+            system_prompt = (
+                "You are a helpful assistant. You must answer the user's question "
+                "using only the provided source context.\n"
+                "If the context does not contain the information needed to answer "
+                "the question, state that you do not know.\n\n"
+                f"Context:\n{context_text}"
+            )
+        else:
+            system_prompt = "You are a helpful assistant."
+
         assert self._chat_agent is not None
 
         try:
@@ -243,6 +272,20 @@ class ConversationService:
         async with self._uow_factory() as uow:
             assistant_msg.content = content_out
             assistant_msg.status = status
+
+            # Persist Citations in Message Metadata
+            if citations:
+                assistant_msg.metadata = {
+                    "citations": [
+                        {
+                            "chunk_id": str(cit.chunk_id),
+                            "document_version_id": str(cit.document_version_id),
+                            "chunk_number": cit.chunk_number,
+                            "score": cit.score,
+                        }
+                        for cit in citations
+                    ]
+                }
 
             usage = LlmUsage(
                 organization_id=conversation.organization_id,
@@ -319,7 +362,29 @@ class ConversationService:
             (msg.role.value, msg.content) for msg in history if msg.id != assistant_msg.id
         ]
 
-        system_prompt = "You are a helpful assistant."
+        # RAG Context retrieval
+        context_text = ""
+        citations: list[Citation] = []
+        if self._retrieval_service and self._context_builder:
+            retrieved = await self._retrieval_service.search(
+                project_id=conversation.project_id,
+                user_id=user_id,
+                query=content.strip(),
+                top_k=20,
+            )
+            context_text, citations = self._context_builder.build_context(retrieved)
+
+        if context_text:
+            system_prompt = (
+                "You are a helpful assistant. You must answer the user's question "
+                "using only the provided source context.\n"
+                "If the context does not contain the information needed to answer "
+                "the question, state that you do not know.\n\n"
+                f"Context:\n{context_text}"
+            )
+        else:
+            system_prompt = "You are a helpful assistant."
+
         assert self._chat_agent is not None
 
         full_content = ""
@@ -359,6 +424,18 @@ class ConversationService:
                 async with self._uow_factory() as uow:
                     assistant_msg.content = full_content
                     assistant_msg.status = status
+                    if citations:
+                        assistant_msg.metadata = {
+                            "citations": [
+                                {
+                                    "chunk_id": str(cit.chunk_id),
+                                    "document_version_id": str(cit.document_version_id),
+                                    "chunk_number": cit.chunk_number,
+                                    "score": cit.score,
+                                }
+                                for cit in citations
+                            ]
+                        }
                     await uow.conversations.save_message(assistant_msg)
 
                     usage = LlmUsage(

@@ -10,6 +10,7 @@ from knowledge_os.infrastructure.workflows.activities import (
     extract_document_metadata,
     extract_document_text,
     finalize_workflow_run,
+    generate_chunk_embeddings,
     update_document_status,
     validate_document,
 )
@@ -48,12 +49,23 @@ async def main() -> None:
         ],
     )
 
+    embedding_worker = Worker(
+        client,
+        task_queue="embedding-processing",
+        workflows=[],
+        activities=[
+            generate_chunk_embeddings,
+        ],
+    )
+
     logging.info(
-        "Workers registered. Polling 'document-processing' and 'chunk-processing' queues..."
+        "Workers registered. Polling 'document-processing', "
+        "'chunk-processing', and 'embedding-processing' queues..."
     )
     await asyncio.gather(
         document_worker.run(),
         chunk_worker.run(),
+        embedding_worker.run(),
     )
 
 

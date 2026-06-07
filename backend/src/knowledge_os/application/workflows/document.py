@@ -66,7 +66,16 @@ class DocumentProcessingWorkflow:
                 task_queue="chunk-processing",
             )
 
-            # 6. Update status to "indexed" representing successful pipeline processing completion
+            # 6. Embed & Index Chunks (Runs on the embedding-processing task queue)
+            await workflow.execute_activity(
+                "generate_chunk_embeddings",
+                payload,
+                start_to_close_timeout=timedelta(minutes=15),
+                retry_policy=retry_policy,
+                task_queue="embedding-processing",
+            )
+
+            # 7. Update status to "indexed" representing successful pipeline processing completion
             indexed_payload = {**payload, "status": "indexed"}
             await workflow.execute_activity(
                 "update_document_status",

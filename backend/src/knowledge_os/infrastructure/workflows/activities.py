@@ -314,3 +314,96 @@ async def chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
         await uow.commit()
 
     return {"chunk_count": len(chunks)}
+
+
+@activity.defn
+async def generate_chunk_embeddings(payload: dict[str, Any]) -> dict[str, Any]:
+    organization_id = UUID(payload["organization_id"])
+    project_id = UUID(payload["project_id"])
+    version_id = UUID(payload["version_id"])
+    workflow_run_id = UUID(payload["workflow_run_id"])
+
+    activity.logger.info(f"Generating chunk embeddings for version {version_id}")
+
+    from knowledge_os.config import get_settings
+    from knowledge_os.domain.entities import ChunkEmbedding
+    from knowledge_os.infrastructure.ai.embeddings import OpenAIEmbeddingProvider
+    from knowledge_os.infrastructure.search.qdrant import QdrantVectorStore
+
+    settings = get_settings()
+    provider = OpenAIEmbeddingProvider(settings)
+    vector_store = QdrantVectorStore(settings)
+
+    # 1. Record embedding started event
+    async with SqlAlchemyUnitOfWork() as uow:
+        event = WorkflowEvent(
+            workflow_run_id=workflow_run_id,
+            event_type="document_embedding_started",
+            payload={"version_id": str(version_id)},
+        )
+        await uow.workflow_events.add(event)
+        await uow.commit()
+
+    # 2. Load chunks for the version from PostgreSQL
+    async with SqlAlchemyUnitOfWork() as uow:
+        chunks = await uow.document_chunks.list_for_version(version_id)
+        if not chunks:
+            return {"chunk_count": 0, "embedding_count": 0}
+
+    # 3. Extract text strings for batch embedding
+    texts = [c.content for c in chunks]
+
+    # 4. Generate embeddings via provider
+    embeddings_vectors = await provider.embed_batch(texts)
+
+    # 5. Create Qdrant collection (if not exists)
+    collection_name = "document_chunks"
+    await vector_store.create_collection(collection_name, provider.dimension)
+
+    # 6. Idempotency safety: delete old vectors from Qdrant first
+    await vector_store.delete_chunks_by_version(collection_name, version_id)
+
+    # 7. Store new vectors in Qdrant
+    chunk_ids = [c.id for c in chunks]
+    await vector_store.upsert_chunks(
+        collection_name=collection_name,
+        vectors=embeddings_vectors,
+        chunk_ids=chunk_ids,
+        organization_id=organization_id,
+        project_id=project_id,
+        document_version_id=version_id,
+    )
+
+    # 8. Create and persist ChunkEmbedding metadata to PostgreSQL
+    embedding_entities = []
+    for chunk in chunks:
+        qdrant_point_id = chunk.id
+        embedding_entities.append(
+            ChunkEmbedding(
+                organization_id=organization_id,
+                document_chunk_id=chunk.id,
+                provider=provider.provider_name,
+                model=provider.model_name,
+                embedding_dimension=provider.dimension,
+                embedding_version=provider.embedding_version,
+                qdrant_point_id=qdrant_point_id,
+            )
+        )
+
+    async with SqlAlchemyUnitOfWork() as uow:
+        await uow.chunk_embeddings.delete_for_version(version_id, provider.embedding_version)
+        await uow.chunk_embeddings.add_batch(embedding_entities)
+
+        # Record completion event
+        event = WorkflowEvent(
+            workflow_run_id=workflow_run_id,
+            event_type="document_embedding_completed",
+            payload={
+                "chunk_count": len(chunks),
+                "embedding_version": provider.embedding_version,
+            },
+        )
+        await uow.workflow_events.add(event)
+        await uow.commit()
+
+    return {"chunk_count": len(chunks), "embedding_count": len(embedding_entities)}
