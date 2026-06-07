@@ -9,6 +9,8 @@ from knowledge_os.application.auth import AuthService
 from knowledge_os.application.conversations import ConversationService
 from knowledge_os.application.documents import DocumentService
 from knowledge_os.application.projects import ProjectService
+from knowledge_os.application.rag import RagService
+from knowledge_os.application.retrieval import RetrievalService
 from knowledge_os.application.workflows import WorkflowService
 from knowledge_os.config import Settings, get_settings
 from knowledge_os.domain.common import AuthenticationError
@@ -54,14 +56,38 @@ def get_document_service(
     return DocumentService(uow_factory=get_uow, storage=storage)
 
 
+def get_retrieval_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> RetrievalService:
+    from knowledge_os.application.retrieval import RetrievalService
+    from knowledge_os.infrastructure.ai.embeddings import OpenAIEmbeddingProvider
+    from knowledge_os.infrastructure.search.qdrant import QdrantVectorStore
+
+    provider = OpenAIEmbeddingProvider(settings)
+    vector_store = QdrantVectorStore(settings)
+    return RetrievalService(
+        uow_factory=get_uow,
+        embedding_provider=provider,
+        vector_store=vector_store,
+    )
+
+
 def get_conversation_service(
     settings: Annotated[Settings, Depends(get_settings)],
+    retrieval_service: Annotated[RetrievalService, Depends(get_retrieval_service)],
 ) -> ConversationService:
+    from knowledge_os.application.context_builder import ContextBuilder
     from knowledge_os.infrastructure.ai.pydantic_ai_adapter import PydanticAiAdapter
     from knowledge_os.infrastructure.services.pricing import ConfigPricingService
 
     pricing_service = ConfigPricingService(pricing_dict=settings.model_pricing)
-    return ConversationService(uow_factory=get_uow, chat_agent=PydanticAiAdapter(pricing_service))
+    context_builder = ContextBuilder()
+    return ConversationService(
+        uow_factory=get_uow,
+        chat_agent=PydanticAiAdapter(pricing_service),
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+    )
 
 
 def get_access_token_service(
@@ -74,6 +100,25 @@ def get_workflow_service() -> WorkflowService:
     from knowledge_os.application.workflows import WorkflowService
 
     return WorkflowService(uow_factory=get_uow)
+
+
+def get_rag_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+    retrieval_service: Annotated[RetrievalService, Depends(get_retrieval_service)],
+) -> RagService:
+    from knowledge_os.application.context_builder import ContextBuilder
+    from knowledge_os.application.rag import RagService
+    from knowledge_os.infrastructure.ai.pydantic_ai_adapter import PydanticAiAdapter
+    from knowledge_os.infrastructure.services.pricing import ConfigPricingService
+
+    pricing_service = ConfigPricingService(pricing_dict=settings.model_pricing)
+    chat_agent = PydanticAiAdapter(pricing_service)
+    context_builder = ContextBuilder()
+    return RagService(
+        retrieval_service=retrieval_service,
+        context_builder=context_builder,
+        chat_agent=chat_agent,
+    )
 
 
 def get_current_user_id(

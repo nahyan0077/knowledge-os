@@ -334,3 +334,34 @@ class WorkflowRunResponse(BaseModel):
 
 class WorkflowRunListResponse(BaseModel):
     items: list[WorkflowRunResponse]
+
+
+class RetrievalSearchRequest(BaseModel):
+    query: str = Field(min_length=1)
+    project_id: UUID
+    top_k: int = Field(default=10, ge=1, le=100)
+
+
+class ScoredChunkResponse(BaseModel):
+    chunk_id: UUID
+    score: float
+    content: str
+    document_version_id: UUID
+    chunk_number: int
+
+
+class RagAskRequest(BaseModel):
+    project_id: UUID
+    question: str = Field(min_length=1)
+
+
+class CitationResponse(BaseModel):
+    chunk_id: UUID
+    document_version_id: UUID
+    chunk_number: int
+    score: float
+
+
+class RagAskResponse(BaseModel):
+    answer: str
+    citations: list[CitationResponse]
