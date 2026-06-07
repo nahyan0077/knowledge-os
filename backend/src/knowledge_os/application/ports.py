@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 
@@ -93,3 +93,54 @@ class PricingService(Protocol):
         input_tokens: int,
         output_tokens: int,
     ) -> float: ...
+
+
+class EmbeddingProvider(Protocol):
+    @property
+    def provider_name(self) -> str: ...
+
+    @property
+    def model_name(self) -> str: ...
+
+    @property
+    def dimension(self) -> int: ...
+
+    @property
+    def embedding_version(self) -> int: ...
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]: ...
+
+
+class VectorStorePort(Protocol):
+    async def create_collection(self, collection_name: str, dimension: int) -> None: ...
+
+    async def upsert_chunks(
+        self,
+        collection_name: str,
+        vectors: list[list[float]],
+        chunk_ids: list[UUID],
+        organization_id: UUID,
+        project_id: UUID,
+        document_version_id: UUID,
+    ) -> None: ...
+
+    async def delete_chunks_by_version(
+        self,
+        collection_name: str,
+        document_version_id: UUID,
+    ) -> None: ...
+
+    async def fetch_chunk_metadata(
+        self,
+        collection_name: str,
+        chunk_id: UUID,
+    ) -> dict[str, Any] | None: ...
+
+    async def search_chunks(
+        self,
+        collection_name: str,
+        organization_id: UUID,
+        project_id: UUID,
+        query_embedding: list[float],
+        top_k: int = 10,
+    ) -> list[tuple[UUID, float]]: ...

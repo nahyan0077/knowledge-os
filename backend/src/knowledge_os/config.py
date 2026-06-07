@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     azure_storage_container_name: str = "documents"
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "default"
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str | None = None
+    qdrant_timeout: int = 10
+    openai_api_key: str | None = None
     model_pricing: dict[str, dict[str, float]] = {
         "gpt-4o-mini": {"input_rate_per_million": 0.150, "output_rate_per_million": 0.600},
         "gpt-4o": {"input_rate_per_million": 5.00, "output_rate_per_million": 15.00},
