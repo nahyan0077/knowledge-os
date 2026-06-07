@@ -1,0 +1,20 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: knowledge_os_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  temporal:
+    image: temporalio/temporal:latest
+    container_name: knowledge_os_temporal
+    entrypoint: ["temporal", "server", "start-dev", "--ip", "0.0.0.0"]
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+
+volumes:
+  qdrant_data:

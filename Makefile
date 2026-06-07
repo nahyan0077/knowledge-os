@@ -5,7 +5,7 @@ UV ?= uv
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup install env migrate migration-sql run test lint format format-check typecheck check clean
+.PHONY: help setup install env migrate migration-sql run test lint format format-check typecheck check clean services-up services-down
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; print "Knowledge OS commands:"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -46,4 +46,11 @@ check: lint format-check typecheck test migration-sql ## Run all repository qual
 
 clean: ## Remove generated Python caches, preserving dependencies and data
 	find $(BACKEND_DIR) -type d \( -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache -o -name .mypy_cache \) -prune -exec rm -rf {} +
+
+services-up: ## Start Qdrant and Temporal in Docker Compose
+	docker compose up -d
+
+services-down: ## Stop Qdrant and Temporal Docker containers
+	docker compose down
+
 
