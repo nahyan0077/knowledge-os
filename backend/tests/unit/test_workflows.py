@@ -23,6 +23,7 @@ from knowledge_os.infrastructure.workflows.activities import (
     extract_document_metadata,
     extract_document_text,
     finalize_workflow_run,
+    generate_chunk_embeddings,
     update_document_status,
     validate_document,
 )
@@ -119,6 +120,34 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
         lambda: FakeUnitOfWork(store),
     )
 
+    # Mock Qdrant and OpenAI Embedding Provider
+    from unittest.mock import AsyncMock, MagicMock
+
+    mock_vector_store = MagicMock()
+    mock_vector_store.create_collection = AsyncMock()
+    mock_vector_store.delete_chunks_by_version = AsyncMock()
+    mock_vector_store.upsert_chunks = AsyncMock()
+
+    mock_provider = MagicMock()
+    mock_provider.provider_name = "openai"
+    mock_provider.model_name = "text-embedding-3-small"
+    mock_provider.dimension = 1536
+    mock_provider.embedding_version = 1
+
+    async def mock_embed_batch(texts):
+        return [[0.1] * 1536 for _ in texts]
+
+    mock_provider.embed_batch = mock_embed_batch
+
+    monkeypatch.setattr(
+        "knowledge_os.infrastructure.ai.embeddings.OpenAIEmbeddingProvider",
+        lambda settings: mock_provider,
+    )
+    monkeypatch.setattr(
+        "knowledge_os.infrastructure.search.qdrant.QdrantVectorStore",
+        lambda settings: mock_vector_store,
+    )
+
     # Start local in-memory temporal server
     async with await WorkflowEnvironment.start_time_skipping() as env:
         doc_worker = Worker(
@@ -143,7 +172,16 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
             ],
         )
 
-        async with doc_worker, chunk_worker:
+        embedding_worker = Worker(
+            env.client,
+            task_queue="embedding-processing",
+            workflows=[],
+            activities=[
+                generate_chunk_embeddings,
+            ],
+        )
+
+        async with doc_worker, chunk_worker, embedding_worker:
             payload = {
                 "organization_id": str(org_id),
                 "project_id": str(project_id),
@@ -181,6 +219,13 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
             assert all(c.char_count == len(c.content) for c in store.document_chunks)
             assert all(c.token_count > 0 for c in store.document_chunks)
 
+            # Assert embeddings were generated and persisted
+            assert len(store.chunk_embeddings) > 0
+            assert all(e.embedding_dimension == 1536 for e in store.chunk_embeddings)
+            assert all(e.embedding_version == 1 for e in store.chunk_embeddings)
+            assert all(e.provider == "openai" for e in store.chunk_embeddings)
+            assert all(e.model == "text-embedding-3-small" for e in store.chunk_embeddings)
+
             # Assert events were recorded
             assert len(store.workflow_events) > 0
             event_types = [e.event_type for e in store.workflow_events]
@@ -191,6 +236,8 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
             assert "document_text_extracted" in event_types
             assert "document_chunking_started" in event_types
             assert "document_chunking_completed" in event_types
+            assert "document_embedding_started" in event_types
+            assert "document_embedding_completed" in event_types
             assert "workflow_finalized" in event_types
 
 
@@ -268,7 +315,16 @@ async def test_document_processing_workflow_validation_failure(monkeypatch: pyte
             ],
         )
 
-        async with doc_worker, chunk_worker:
+        embedding_worker = Worker(
+            env.client,
+            task_queue="embedding-processing",
+            workflows=[],
+            activities=[
+                generate_chunk_embeddings,
+            ],
+        )
+
+        async with doc_worker, chunk_worker, embedding_worker:
             payload = {
                 "organization_id": str(org_id),
                 "project_id": str(project_id),

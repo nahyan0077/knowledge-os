@@ -9,6 +9,7 @@ from knowledge_os.application.ports import (
     LlmUsageMetrics,
 )
 from knowledge_os.domain.entities import (
+    ChunkEmbedding,
     Conversation,
     Document,
     DocumentChunk,
@@ -43,6 +44,7 @@ class Store:
     workflow_runs: dict[UUID, WorkflowRun] = field(default_factory=dict)
     workflow_events: list[WorkflowEvent] = field(default_factory=list)
     document_chunks: list[DocumentChunk] = field(default_factory=list)
+    chunk_embeddings: list[ChunkEmbedding] = field(default_factory=list)
 
 
 class UserRepo:
@@ -451,6 +453,40 @@ class FakeDocumentChunkRepository:
             c for c in self.store.document_chunks if c.version_id != version_id
         ]
 
+    async def list_by_ids(self, ids: Sequence[UUID]) -> Sequence[DocumentChunk]:
+        import copy
+
+        id_set = set(ids)
+        chunks = [c for c in self.store.document_chunks if c.id in id_set]
+        return [copy.deepcopy(c) for c in chunks]
+
+
+class FakeChunkEmbeddingRepository:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+
+    async def add_batch(self, embeddings: Sequence[ChunkEmbedding]) -> None:
+        self.store.chunk_embeddings.extend(embeddings)
+
+    async def list_for_version(
+        self, version_id: UUID, embedding_version: int
+    ) -> Sequence[ChunkEmbedding]:
+        chunk_ids = {c.id for c in self.store.document_chunks if c.version_id == version_id}
+        embeddings = [
+            e
+            for e in self.store.chunk_embeddings
+            if e.document_chunk_id in chunk_ids and e.embedding_version == embedding_version
+        ]
+        return embeddings
+
+    async def delete_for_version(self, version_id: UUID, embedding_version: int) -> None:
+        chunk_ids = {c.id for c in self.store.document_chunks if c.version_id == version_id}
+        self.store.chunk_embeddings = [
+            e
+            for e in self.store.chunk_embeddings
+            if not (e.document_chunk_id in chunk_ids and e.embedding_version == embedding_version)
+        ]
+
 
 class FakeUnitOfWork:
     def __init__(self, store: Store) -> None:
@@ -465,6 +501,7 @@ class FakeUnitOfWork:
         self.workflow_runs = FakeWorkflowRunRepository(store)
         self.workflow_events = FakeWorkflowEventRepository(store)
         self.document_chunks = FakeDocumentChunkRepository(store)
+        self.chunk_embeddings = FakeChunkEmbeddingRepository(store)
         self.commits = 0
 
     async def __aenter__(self) -> "FakeUnitOfWork":
