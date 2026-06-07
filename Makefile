@@ -5,10 +5,10 @@ UV ?= uv
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup install env migrate migration-sql run test lint format format-check typecheck check clean services-up services-down
+.PHONY: help setup install env migrate migration-sql run test lint format format-check typecheck check clean services-up services-down frontend-install frontend worker qdrant-ui temporal-ui
 
 help: ## Show available commands
-	@awk 'BEGIN {FS = ":.*## "; print "Knowledge OS commands:"} /^[a-zA-Z_-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; print "Knowledge OS commands:"} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 setup: env install migrate ## Create local environment, install dependencies, and migrate database
 
@@ -52,5 +52,21 @@ services-up: ## Start Qdrant and Temporal in Docker Compose
 
 services-down: ## Stop Qdrant and Temporal Docker containers
 	docker compose down
+
+frontend-install: ## Install frontend dependencies
+	cd frontend && npm install
+
+frontend: ## Run the Next.js frontend development server
+	cd frontend && npm run dev
+
+worker: ## Run the Temporal background workers
+	cd $(BACKEND_DIR) && $(UV) run python -m knowledge_os.worker
+
+qdrant-ui: ## Open Qdrant Web UI Dashboard
+	$(UV) run python -m webbrowser http://localhost:6333/dashboard
+
+temporal-ui: ## Open Temporal Web UI Dashboard
+	$(UV) run python -m webbrowser http://localhost:8233
+
 
 
