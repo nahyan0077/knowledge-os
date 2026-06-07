@@ -188,10 +188,9 @@ async def extract_document_text(payload: dict[str, Any]) -> dict[str, Any]:
 
     from knowledge_os.application.services.extraction import TextExtractor
     from knowledge_os.config import get_settings
-    from knowledge_os.infrastructure.storage.azure import AzureBlobStorageAdapter
+    from knowledge_os.infrastructure.storage.factory import StorageFactory
 
     settings = get_settings()
-    storage = AzureBlobStorageAdapter(settings)
     extractor = TextExtractor()
 
     # 1. Record extraction started event
@@ -211,6 +210,7 @@ async def extract_document_text(payload: dict[str, Any]) -> dict[str, Any]:
             raise NotFoundError("Version not found", "version_not_found")
         blob_path = version.blob_path
         mime_type = version.mime_type
+        storage = StorageFactory.get_storage(settings, version.storage_provider)
 
     # 3. Download binary contents
     content_bytes = await storage.download(blob_path)
@@ -252,16 +252,16 @@ async def chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
     document_id = UUID(payload["document_id"])
     version_id = UUID(payload["version_id"])
     workflow_run_id = UUID(payload["workflow_run_id"])
+    user_id = UUID(payload["user_id"])
     extracted_text_path = payload["extracted_text_path"]
 
     activity.logger.info(f"Chunking document {document_id} from {extracted_text_path}")
 
     from knowledge_os.application.services.extraction import TextChunker
     from knowledge_os.config import get_settings
-    from knowledge_os.infrastructure.storage.azure import AzureBlobStorageAdapter
+    from knowledge_os.infrastructure.storage.factory import StorageFactory
 
     settings = get_settings()
-    storage = AzureBlobStorageAdapter(settings)
     chunker = TextChunker()
 
     # 1. Record chunking started event
@@ -274,7 +274,14 @@ async def chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
         await uow.workflow_events.add(event)
         await uow.commit()
 
-    # 2. Download extracted text
+    # 2. Retrieve version properties
+    async with SqlAlchemyUnitOfWork() as uow:
+        version = await uow.documents.get_version_by_id(version_id, user_id)
+        if not version:
+            raise NotFoundError("Version not found", "version_not_found")
+        storage = StorageFactory.get_storage(settings, version.storage_provider)
+
+    # 3. Download extracted text
     content_bytes = await storage.download(extracted_text_path)
     text = content_bytes.decode("utf-8")
 
@@ -327,11 +334,11 @@ async def generate_chunk_embeddings(payload: dict[str, Any]) -> dict[str, Any]:
 
     from knowledge_os.config import get_settings
     from knowledge_os.domain.entities import ChunkEmbedding
-    from knowledge_os.infrastructure.ai.embeddings import OpenAIEmbeddingProvider
+    from knowledge_os.infrastructure.ai.embeddings import EmbeddingProviderFactory
     from knowledge_os.infrastructure.search.qdrant import QdrantVectorStore
 
     settings = get_settings()
-    provider = OpenAIEmbeddingProvider(settings)
+    provider = EmbeddingProviderFactory.get_provider(settings)
     vector_store = QdrantVectorStore(settings)
 
     # 1. Record embedding started event

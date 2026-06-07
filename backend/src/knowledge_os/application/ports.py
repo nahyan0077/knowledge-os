@@ -27,6 +27,11 @@ class RefreshTokenService(Protocol):
 
 
 class BlobStoragePort(Protocol):
+    @property
+    def provider_name(self) -> str:
+        """Returns the identifier of this storage provider."""
+        ...
+
     async def upload(self, blob_path: str, data: bytes, content_type: str) -> str:
         """Uploads file data and returns the etag string."""
         ...

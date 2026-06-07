@@ -24,6 +24,10 @@ class FakeBlobStorage:
     def __init__(self) -> None:
         self.files = {}
 
+    @property
+    def provider_name(self) -> str:
+        return "local"
+
     async def upload(self, blob_path: str, data: bytes, content_type: str) -> str:
         self.files[blob_path] = data
         return f"etag-{len(data)}"

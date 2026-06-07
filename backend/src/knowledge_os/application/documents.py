@@ -73,6 +73,7 @@ class DocumentService:
                 size_bytes=len(data),
                 sha256=sha256,
                 etag=etag,
+                storage_provider=self._storage.provider_name,
                 status=DocumentVersionStatus.UPLOADED,
             )
 
@@ -138,6 +139,7 @@ class DocumentService:
                 size_bytes=len(data),
                 sha256=sha256,
                 etag=etag,
+                storage_provider=self._storage.provider_name,
                 status=DocumentVersionStatus.UPLOADED,
             )
 

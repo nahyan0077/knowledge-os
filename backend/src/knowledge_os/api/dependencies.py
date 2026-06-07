@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from knowledge_os.application.auth import AuthService
 from knowledge_os.application.conversations import ConversationService
 from knowledge_os.application.documents import DocumentService
+from knowledge_os.application.ports import BlobStoragePort
 from knowledge_os.application.projects import ProjectService
 from knowledge_os.application.rag import RagService
 from knowledge_os.application.retrieval import RetrievalService
@@ -21,7 +22,6 @@ from knowledge_os.infrastructure.security.services import (
     JwtAccessTokenService,
     OpaqueRefreshTokenService,
 )
-from knowledge_os.infrastructure.storage.azure import AzureBlobStorageAdapter
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -46,12 +46,14 @@ def get_project_service() -> ProjectService:
 
 def get_blob_storage_service(
     settings: Annotated[Settings, Depends(get_settings)],
-) -> AzureBlobStorageAdapter:
-    return AzureBlobStorageAdapter(settings)
+) -> BlobStoragePort:
+    from knowledge_os.infrastructure.storage.factory import StorageFactory
+
+    return StorageFactory.get_storage(settings)
 
 
 def get_document_service(
-    storage: Annotated[AzureBlobStorageAdapter, Depends(get_blob_storage_service)],
+    storage: Annotated[BlobStoragePort, Depends(get_blob_storage_service)],
 ) -> DocumentService:
     return DocumentService(uow_factory=get_uow, storage=storage)
 
@@ -60,10 +62,10 @@ def get_retrieval_service(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> RetrievalService:
     from knowledge_os.application.retrieval import RetrievalService
-    from knowledge_os.infrastructure.ai.embeddings import OpenAIEmbeddingProvider
+    from knowledge_os.infrastructure.ai.embeddings import EmbeddingProviderFactory
     from knowledge_os.infrastructure.search.qdrant import QdrantVectorStore
 
-    provider = OpenAIEmbeddingProvider(settings)
+    provider = EmbeddingProviderFactory.get_provider(settings)
     vector_store = QdrantVectorStore(settings)
     return RetrievalService(
         uow_factory=get_uow,
