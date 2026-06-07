@@ -81,9 +81,32 @@
   - Refactored `chunk_document` (on dedicated `chunk-processing` queue) to construct chunks with exact character count and token count values and commit them idempotently.
 - **Testing**: Added unit tests for PDF extraction, empty/malformed PDF handling, and tiktoken counting. Added integration assertions for chunk metadata persistence in database repositories and workflow execution. All 54 checks passing.
 
+### Sprint 7 (Embeddings & Vector Index Infrastructure) - Completed
+- **Domain Entities**: Defined `ChunkEmbedding` entity tracking provider, model, dimension, version, and vector point associations, along with its async CRUD repository.
+- **Database Schema**: Created `chunk_embeddings` table with indexing on `organization_id`, `document_chunk_id`, and `embedding_version`, and unique constraint `(document_chunk_id, embedding_version)`. Applied Alembic migration `2f32957df35e`.
+- **OpenAI Embedding Provider**: Implemented `OpenAIEmbeddingProvider` protocol wrapper supporting batch embedding generation via OpenAI's embeddings API, defaulting to `text-embedding-3-small` (1536 dimensions, version 1).
+- **Qdrant Vector Store**: Implemented `QdrantVectorStore` (conforming to `VectorStorePort`) utilizing `Distance.COSINE` and indexing layout preserving multi-tenant properties (`organization_id`, `project_id`, `document_version_id`).
+- **Temporal Ingestion Workflow**: Integrated `generate_chunk_embeddings` activity running on the `embedding-processing` queue. The workflow lifecycle is `Validate -> Extract -> Chunk -> Embed -> Index`, with idempotency safety via version purges before upserts.
+- **Tests**: Implemented unit tests for provider and adapter mocks, integration repository assertions, and E2E workflow integration testing. All quality gates pass.
+
+### Sprint 8 (Retrieval Infrastructure) - Completed
+- **Retrieval Service**: Built `RetrievalService` coordinating query embedding generation, tenant-isolated vector search, and authoritative PostgreSQL chunk hydration.
+- **Qdrant Search**: Implemented `search_chunks` on `QdrantVectorStore` enforcing tenant payload filters (`organization_id`, `project_id`) during queries.
+- **PostgreSQL Hydration**: Implemented `list_by_ids` on `DocumentChunkRepository` to retrieve authoritative, transactionally consistent chunk text from the database (separating storage concerns from Qdrant payloads).
+- **FastAPI API Route**: Exposed the query contract via `POST /api/v1/retrieval/search` which maps search inputs (query, project_id, top_k) to domain search results.
+- **Quality Gates**: Verified end-to-end functionality via unit tests (query embedding, hydration logic) and integration tests (Qdrant search, PostgreSQL hydration, tenant isolation checks). 61 total tests passing.
+
+### Sprint 9 (Context Builder, Citation Engine, and RAG Generation) - Completed
+- **Domain Entities**: Defined `Citation` domain model (chunk_id, document_version_id, chunk_number, score).
+- **Context Builder**: Implemented `ContextBuilder` executing sorting, deduplication, token budget limits, and context generation.
+- **RAG Service**: Implemented `RagService` orchestrating question, retrieval, context builder, and PydanticAI answer generation.
+- **API Endpoint**: Exposed `POST /api/v1/rag/ask` requesting `project_id` and `question`, and returning `answer` and `citations`.
+- **Chat Integration**: Updated chat workflow in `ConversationService` (`send_message` and `send_message_stream`) to fetch context and persist citations in `Message` metadata.
+- **Tests**: Implemented unit tests (ContextBuilder, RagService) and integration tests (RAG E2E, router routes, and tenant boundary verification). 68 total tests passing.
+
 ## Technical Debt & Risks
 - **Blob Storage Cleanup**: Soft-deleting a document currently retains files in Azure Blob Storage. Hard delete logic or automated cleanup workflows are planned for later phases.
 - **Docker Dependency**: Integration tests require Docker daemon to run.
 
 ## Next Steps
-- Implement Sprint 7 (Embeddings & Vector Search / Qdrant / RAG Integration).
+- Implement Agent Runs & Auditing (Sprint 10).

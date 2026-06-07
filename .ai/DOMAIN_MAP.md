@@ -52,12 +52,12 @@
 
 ### Retrieval
 
-**Status:** Planned.
+**Status:** Implemented (Sprint 7, 8 & 9 completed).
 
-- Responsibilities: authorized candidate retrieval, fusion, reranking, context construction, diagnostics.
-- Public APIs: project knowledge search and internal retrieval port.
-- Tables: reads authoritative `chunks`; no aggregate tables initially.
-- Dependencies: Projects authorization, Knowledge/chunk query port, Qdrant adapter, reranker port.
+- Responsibilities: tracking embedding metadata and versions, upserting/deleting vectors in Qdrant, authorized query embedding generation, tenant-isolated vector search, authoritative PostgreSQL chunk hydration, scoring, context building/deduplication, token budget enforcement, citation tracking/mapping.
+- Public APIs: `POST /retrieval/search` (through `RetrievalService`), `POST /rag/ask` (through `RagService`).
+- Tables: `chunk_embeddings` table; reads authoritative `document_chunks`.
+- Dependencies: Projects authorization, Documents (chunks), Qdrant adapter, OpenAI embeddings API, PydanticAI gateway.
 - Must not access: authentication credentials, mutate documents, invoke unrestricted agent tools.
 
 ### Agents

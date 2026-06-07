@@ -20,10 +20,11 @@ flowchart LR
     Web --> API[FastAPI API]
     API --> PG[(PostgreSQL)]
     API --> Temporal[Temporal]
+    API --> Qdrant[Qdrant]
     Temporal --> Workers[Workers]
     Workers --> PG
     Workers --> Blob[Azure Blob]
-    Workers --> Qdrant[Qdrant - Planned]
+    Workers --> Qdrant
     API --> AI[PydanticAI Gateway]
     Workers --> AI
     AI --> OpenAI
@@ -67,7 +68,7 @@ frontend/src/
 | Temporal ingestion worker | Document validation, status updates, metadata extraction, PDF and plain text extraction, tiktoken tokenization, sliding-window chunking, metrics calculation | Implemented |
 | Temporal agent worker | Agent and report execution | Planned |
 | PostgreSQL | Business truth and product-facing projections | Implemented |
-| Qdrant | Derived vector index | Planned |
+| Qdrant | Derived vector index | Implemented |
 | Azure Blob | Immutable binaries and generated storage provider | Implemented |
 | PydanticAI gateway | Provider-neutral model and agent execution | Implemented |
 
@@ -107,6 +108,24 @@ HTTP command
   -> Temporal workflow
   -> idempotent activities
   -> PostgreSQL progress/result projection
+
+RAG generation flow:
+HTTP request (/rag/ask)
+  -> FastAPI validation
+  -> bearer identity dependency
+  -> RagService orchestration
+  -> RetrievalService (vector search on Qdrant + PostgreSQL chunk hydration)
+  -> ContextBuilder (deduplication, token budget validation, context formatting)
+  -> ChatAgentPort (PydanticAI generation via LLM model)
+  -> Response schema with Answer + Citations
+
+Chat message citation flow:
+HTTP request (/conversations/{id}/chat)
+  -> ConversationService orchestration
+  -> RetrievalService + ContextBuilder (RAG Context and Citation compilation)
+  -> ChatAgentPort (generates assistant answer using the grounded context)
+  -> Persistent assistant Message created in DB with Citations in metadata
+  -> Response with User Message + Assistant Message + Usage metrics
 ```
 
 ## Related Decisions
