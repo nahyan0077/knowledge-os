@@ -22,6 +22,10 @@ class AzureBlobStorageAdapter:
         else:
             self.client = BlobServiceClient.from_connection_string(self.conn_str)
 
+    @property
+    def provider_name(self) -> str:
+        return "azure_blob" if self.conn_str else "local"
+
     async def upload(self, blob_path: str, data: bytes, content_type: str) -> str:
         if not self.client:
             file_path = self._local_storage_dir / blob_path
