@@ -99,9 +99,9 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
 
     # Pre-upload mock document text to local storage fallback
     from knowledge_os.config import get_settings
-    from knowledge_os.infrastructure.storage.azure import AzureBlobStorageAdapter
+    from knowledge_os.infrastructure.storage.factory import StorageFactory
 
-    storage = AzureBlobStorageAdapter(get_settings())
+    storage = StorageFactory.get_storage(get_settings())
     await storage.upload(
         "test_blob",
         (
@@ -140,8 +140,8 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
     mock_provider.embed_batch = mock_embed_batch
 
     monkeypatch.setattr(
-        "knowledge_os.infrastructure.ai.embeddings.OpenAIEmbeddingProvider",
-        lambda settings: mock_provider,
+        "knowledge_os.infrastructure.ai.embeddings.EmbeddingProviderFactory.get_provider",
+        lambda settings, provider=None: mock_provider,
     )
     monkeypatch.setattr(
         "knowledge_os.infrastructure.search.qdrant.QdrantVectorStore",
