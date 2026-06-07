@@ -238,3 +238,25 @@ class DocumentChunk:
     char_count: int
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(slots=True)
+class ChunkEmbedding:
+    organization_id: UUID
+    document_chunk_id: UUID
+    provider: str
+    model: str
+    embedding_dimension: int
+    embedding_version: int
+    qdrant_point_id: UUID
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+
+
+@dataclass(slots=True)
+class Citation:
+    chunk_id: UUID
+    document_version_id: UUID
+    chunk_number: int
+    score: float

@@ -3,6 +3,7 @@ from typing import Protocol
 from uuid import UUID
 
 from knowledge_os.domain.entities import (
+    ChunkEmbedding,
     Conversation,
     Document,
     DocumentChunk,
@@ -111,6 +112,15 @@ class DocumentChunkRepository(Protocol):
     async def add_batch(self, chunks: Sequence[DocumentChunk]) -> None: ...
     async def list_for_version(self, version_id: UUID) -> Sequence[DocumentChunk]: ...
     async def delete_for_version(self, version_id: UUID) -> None: ...
+    async def list_by_ids(self, ids: Sequence[UUID]) -> Sequence[DocumentChunk]: ...
+
+
+class ChunkEmbeddingRepository(Protocol):
+    async def add_batch(self, embeddings: Sequence[ChunkEmbedding]) -> None: ...
+    async def list_for_version(
+        self, version_id: UUID, embedding_version: int
+    ) -> Sequence[ChunkEmbedding]: ...
+    async def delete_for_version(self, version_id: UUID, embedding_version: int) -> None: ...
 
 
 class UnitOfWork(Protocol):
@@ -124,6 +134,7 @@ class UnitOfWork(Protocol):
     workflow_runs: WorkflowRunRepository
     workflow_events: WorkflowEventRepository
     document_chunks: DocumentChunkRepository
+    chunk_embeddings: ChunkEmbeddingRepository
 
     async def __aenter__(self) -> "UnitOfWork": ...
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...

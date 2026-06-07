@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from knowledge_os.domain.common import ConflictError
 from knowledge_os.domain.entities import (
+    ChunkEmbedding,
     Conversation,
     Document,
     DocumentChunk,
@@ -25,6 +26,7 @@ from knowledge_os.domain.entities import (
     WorkflowRun,
 )
 from knowledge_os.infrastructure.database.models import (
+    ChunkEmbeddingModel,
     ConversationModel,
     DocumentChunkModel,
     DocumentModel,
@@ -871,4 +873,82 @@ class SqlAlchemyDocumentChunkRepository:
 
         await self.session.execute(
             delete(DocumentChunkModel).where(DocumentChunkModel.version_id == version_id)
+        )
+
+    async def list_by_ids(self, ids: Sequence[UUID]) -> Sequence[DocumentChunk]:
+        if not ids:
+            return []
+        rows = (
+            await self.session.scalars(
+                select(DocumentChunkModel).where(DocumentChunkModel.id.in_(ids))
+            )
+        ).all()
+        return [to_document_chunk(row) for row in rows]
+
+
+def to_chunk_embedding(row: ChunkEmbeddingModel) -> ChunkEmbedding:
+    return ChunkEmbedding(
+        id=row.id,
+        organization_id=row.organization_id,
+        document_chunk_id=row.document_chunk_id,
+        provider=row.provider,
+        model=row.model,
+        embedding_dimension=row.embedding_dimension,
+        embedding_version=row.embedding_version,
+        qdrant_point_id=row.qdrant_point_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+class SqlAlchemyChunkEmbeddingRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def add_batch(self, embeddings: Sequence[ChunkEmbedding]) -> None:
+        for emb in embeddings:
+            self.session.add(
+                ChunkEmbeddingModel(
+                    id=emb.id,
+                    organization_id=emb.organization_id,
+                    document_chunk_id=emb.document_chunk_id,
+                    provider=emb.provider,
+                    model=emb.model,
+                    embedding_dimension=emb.embedding_dimension,
+                    embedding_version=emb.embedding_version,
+                    qdrant_point_id=emb.qdrant_point_id,
+                    created_at=emb.created_at,
+                    updated_at=emb.updated_at,
+                )
+            )
+
+    async def list_for_version(
+        self, version_id: UUID, embedding_version: int
+    ) -> Sequence[ChunkEmbedding]:
+        rows = (
+            await self.session.scalars(
+                select(ChunkEmbeddingModel)
+                .join(
+                    DocumentChunkModel,
+                    DocumentChunkModel.id == ChunkEmbeddingModel.document_chunk_id,
+                )
+                .where(
+                    DocumentChunkModel.version_id == version_id,
+                    ChunkEmbeddingModel.embedding_version == embedding_version,
+                )
+                .order_by(DocumentChunkModel.chunk_index.asc())
+            )
+        ).all()
+        return [to_chunk_embedding(row) for row in rows]
+
+    async def delete_for_version(self, version_id: UUID, embedding_version: int) -> None:
+        from sqlalchemy import delete
+
+        subquery = select(DocumentChunkModel.id).where(DocumentChunkModel.version_id == version_id)
+
+        await self.session.execute(
+            delete(ChunkEmbeddingModel).where(
+                ChunkEmbeddingModel.document_chunk_id.in_(subquery),
+                ChunkEmbeddingModel.embedding_version == embedding_version,
+            )
         )

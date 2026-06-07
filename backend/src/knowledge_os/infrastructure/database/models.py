@@ -425,3 +425,35 @@ class DocumentChunkModel(Base):
         Index("ix_document_chunks_org_doc", "organization_id", "document_id"),
         Index("ix_document_chunks_version_id", "version_id"),
     )
+
+
+class ChunkEmbeddingModel(Base):
+    __tablename__ = "chunk_embeddings"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    document_chunk_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("document_chunks.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    embedding_dimension: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    qdrant_point_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "document_chunk_id", "embedding_version", name="uq_chunk_embedding_version"
+        ),
+        Index("ix_chunk_embeddings_org_id", "organization_id"),
+        Index("ix_chunk_embeddings_chunk_id", "document_chunk_id"),
+        Index("ix_chunk_embeddings_version", "embedding_version"),
+    )
