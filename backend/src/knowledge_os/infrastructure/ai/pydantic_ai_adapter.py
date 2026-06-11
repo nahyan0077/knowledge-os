@@ -28,11 +28,27 @@ from knowledge_os.application.ports import (
 
 
 def _get_model(config: LlmModelConfig) -> Model:
+    import os
+    from knowledge_os.config import get_settings
+
+    settings = get_settings()
     p = config.provider.lower()
     if p == "openai":
+        if settings.openai_api_key:
+            os.environ["OPENAI_API_KEY"] = settings.openai_api_key
         return OpenAIModel(config.model_name)
     elif p in {"gemini", "google"}:
-        return GeminiModel(config.model_name)
+        if settings.gemini_api_key:
+            os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
+        model_name = config.model_name
+        if model_name in {
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash",
+            "gemini-2.5-flash",
+        }:
+            model_name = "gemini-flash-lite-latest"
+        return GeminiModel(model_name)
     elif p == "anthropic":
         return AnthropicModel(config.model_name)
     elif p == "test":

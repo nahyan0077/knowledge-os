@@ -137,15 +137,15 @@ class QdrantVectorStore(VectorStorePort):
             ]
         )
         try:
-            results = self.client.search(  # type: ignore[attr-defined]
+            results = self.client.query_points(
                 collection_name=collection_name,
-                query_vector=query_embedding,
+                query=query_embedding,
                 query_filter=query_filter,
                 limit=top_k,
                 with_payload=False,
                 with_vectors=False,
             )
-            return [(UUID(str(res.id)), res.score) for res in results]
+            return [(UUID(str(res.id)), res.score) for res in results.points]
         except Exception as e:
             logger.error(f"Failed to search collection {collection_name}: {e}")
             raise e

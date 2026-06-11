@@ -83,3 +83,22 @@ async def test_qdrant_vector_store_operations(monkeypatch: pytest.MonkeyPatch) -
     metadata = await store.fetch_chunk_metadata("document_chunks", chunk_id)
     assert metadata == {"chunk_id": "fake-chunk-id"}
     mock_client.retrieve.assert_called_once()
+
+    # 5. Test Search Chunks
+    mock_scored_point = MagicMock()
+    mock_scored_point.id = str(chunk_id)
+    mock_scored_point.score = 0.95
+    mock_query_response = MagicMock()
+    mock_query_response.points = [mock_scored_point]
+    mock_client.query_points.return_value = mock_query_response
+
+    results = await store.search_chunks(
+        collection_name="document_chunks",
+        organization_id=org_id,
+        project_id=project_id,
+        query_embedding=[0.1] * 1536,
+        top_k=5,
+    )
+    assert len(results) == 1
+    assert results[0] == (chunk_id, 0.95)
+    mock_client.query_points.assert_called_once()
