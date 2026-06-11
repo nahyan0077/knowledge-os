@@ -40,7 +40,7 @@ export default function ChatWorkspacePage() {
   const queryClient = useQueryClient();
   const conversationId = params?.conversationId as string;
   const projectId = params?.projectId as string;
-  const { accessToken } = useAuthStore();
+  const { accessToken, organization } = useAuthStore();
 
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelOption>(MODEL_OPTIONS[0]);
@@ -49,9 +49,11 @@ export default function ChatWorkspacePage() {
 
   // Fetch Project Documents for selection
   const { data: documentsData } = useQuery<{ items: any[] }>({
-    queryKey: ['documents', projectId],
-    queryFn: () => apiClient<{ items: any[] }>(`/projects/${projectId}/documents`),
-    enabled: !!projectId,
+    queryKey: ['documents', projectId, organization?.id],
+    queryFn: () => apiClient<{ items: any[] }>(`/projects/${projectId}/documents`, {
+      params: { organization_id: organization?.id },
+    }),
+    enabled: !!projectId && !!organization?.id,
   });
   const documents = documentsData?.items || [];
   
