@@ -123,19 +123,27 @@ class QdrantVectorStore(VectorStorePort):
         project_id: UUID,
         query_embedding: list[float],
         top_k: int = 10,
+        document_version_ids: list[UUID] | None = None,
     ) -> list[tuple[UUID, float]]:
-        query_filter = rest_models.Filter(
-            must=[
+        must_conditions: list[rest_models.Condition] = [
+            rest_models.FieldCondition(
+                key="organization_id",
+                match=rest_models.MatchValue(value=str(organization_id)),
+            ),
+            rest_models.FieldCondition(
+                key="project_id",
+                match=rest_models.MatchValue(value=str(project_id)),
+            ),
+        ]
+        if document_version_ids:
+            must_conditions.append(
                 rest_models.FieldCondition(
-                    key="organization_id",
-                    match=rest_models.MatchValue(value=str(organization_id)),
-                ),
-                rest_models.FieldCondition(
-                    key="project_id",
-                    match=rest_models.MatchValue(value=str(project_id)),
-                ),
-            ]
-        )
+                    key="document_version_id",
+                    match=rest_models.MatchAny(any=[str(vid) for vid in document_version_ids]),
+                )
+            )
+
+        query_filter = rest_models.Filter(must=must_conditions)
         try:
             results = self.client.query_points(
                 collection_name=collection_name,

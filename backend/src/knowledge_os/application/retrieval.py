@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -34,6 +34,7 @@ class RetrievalService:
         user_id: UUID,
         query: str,
         top_k: int = 10,
+        document_ids: Sequence[UUID] | None = None,
     ) -> list[ScoredChunk]:
         async with self._uow_factory() as uow:
             # 1. Authorize user has read access to the project
@@ -43,6 +44,18 @@ class RetrievalService:
 
             # Get organization_id from project
             organization_id = project.organization_id
+
+        # Resolve document_ids to version_ids
+        document_version_ids = None
+        if document_ids is not None:
+            document_version_ids = []
+            async with self._uow_factory() as uow:
+                for doc_id in document_ids:
+                    doc = await uow.documents.get_by_id(doc_id, user_id)
+                    if doc and doc.current_version_id:
+                        document_version_ids.append(doc.current_version_id)
+            if not document_version_ids:
+                return []
 
         # 2. Generate embedding for query
         query_embeddings = await self._embedding_provider.embed_batch([query])
@@ -57,6 +70,7 @@ class RetrievalService:
             project_id=project_id,
             query_embedding=query_embedding,
             top_k=top_k,
+            document_version_ids=document_version_ids,
         )
         if not candidates:
             return []

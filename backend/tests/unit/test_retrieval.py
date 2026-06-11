@@ -103,6 +103,7 @@ async def test_retrieval_service_search_success() -> None:
         project_id=project_id,
         query_embedding=[0.1] * 1536,
         top_k=5,
+        document_version_ids=None,
     )
 
 
@@ -186,3 +187,92 @@ async def test_retrieval_service_tenant_isolation_boundary() -> None:
     assert len(results) == 1
     assert results[0].chunk_id == chunk_id_1
     assert results[0].score == 0.95
+
+
+@pytest.mark.asyncio
+async def test_retrieval_service_document_id_filtering() -> None:
+    from knowledge_os.domain.entities import Document, Project, ProjectMembership
+
+    store = Store()
+    org_id = uuid4()
+    project_id = uuid4()
+    user_id = uuid4()
+    doc_id = uuid4()
+    version_id = uuid4()
+
+    # Pre-populate store
+    project = Project(
+        id=project_id,
+        organization_id=org_id,
+        name="Test Project",
+        created_by=user_id,
+    )
+    store.projects[project_id] = project
+    store.project_memberships.append(
+        ProjectMembership(
+            organization_id=org_id,
+            project_id=project_id,
+            user_id=user_id,
+            role=MembershipRole.OWNER,
+        )
+    )
+
+    doc = Document(
+        id=doc_id,
+        organization_id=org_id,
+        project_id=project_id,
+        name="Document A",
+        created_by=user_id,
+        current_version_id=version_id,
+    )
+    store.documents[doc_id] = doc
+
+    chunk_id = uuid4()
+    chunk = DocumentChunk(
+        id=chunk_id,
+        organization_id=org_id,
+        document_id=doc_id,
+        version_id=version_id,
+        chunk_index=1,
+        content="Document A chunk content",
+        char_offset=0,
+        token_count=5,
+        char_count=24,
+    )
+    store.document_chunks.append(chunk)
+
+    mock_provider = MagicMock()
+    mock_provider.embed_batch = AsyncMock(return_value=[[0.1] * 1536])
+
+    mock_vector_store = MagicMock()
+    mock_vector_store.search_chunks = AsyncMock(return_value=[(chunk_id, 0.95)])
+
+    def uow_factory():
+        return FakeUnitOfWork(store)
+
+    service = RetrievalService(
+        uow_factory=uow_factory,
+        embedding_provider=mock_provider,
+        vector_store=mock_vector_store,
+    )
+
+    results = await service.search(
+        project_id=project_id,
+        user_id=user_id,
+        query="test query",
+        top_k=5,
+        document_ids=[doc_id],
+    )
+
+    assert len(results) == 1
+    assert results[0].chunk_id == chunk_id
+    assert results[0].content == "Document A chunk content"
+
+    mock_vector_store.search_chunks.assert_called_once_with(
+        collection_name="document_chunks",
+        organization_id=org_id,
+        project_id=project_id,
+        query_embedding=[0.1] * 1536,
+        top_k=5,
+        document_version_ids=[version_id],
+    )

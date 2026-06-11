@@ -242,6 +242,7 @@ class ChatMessageRequest(BaseModel):
     provider: str = Field(default="openai", max_length=100)
     model: str = Field(default="gpt-4o-mini", max_length=100)
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+    selected_document_ids: list[UUID] | None = Field(default=None)
 
 
 class LlmUsageResponse(BaseModel):

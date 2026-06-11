@@ -148,4 +148,5 @@ class VectorStorePort(Protocol):
         project_id: UUID,
         query_embedding: list[float],
         top_k: int = 10,
+        document_version_ids: list[UUID] | None = None,
     ) -> list[tuple[UUID, float]]: ...

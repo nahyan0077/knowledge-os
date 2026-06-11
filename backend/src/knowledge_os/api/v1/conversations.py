@@ -148,6 +148,7 @@ async def chat(
         user_id=user_id,
         content=req.content,
         config=config,
+        selected_document_ids=req.selected_document_ids,
     )
     return ChatMessageResponse(
         user_message=MessageResponse.from_domain(user_msg),
@@ -175,6 +176,7 @@ async def chat_stream(
                 user_id=user_id,
                 content=req.content,
                 config=config,
+                selected_document_ids=req.selected_document_ids,
             ):
                 if isinstance(item, Message):
                     if item.role == MessageRole.USER:

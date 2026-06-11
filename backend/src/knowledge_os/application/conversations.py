@@ -189,6 +189,7 @@ class ConversationService:
         user_id: UUID,
         content: str,
         config: LlmModelConfig,
+        selected_document_ids: Sequence[UUID] | None = None,
     ) -> tuple[Message, Message, LlmUsage]:
         if not content.strip():
             raise ValidationError("Message content cannot be empty", "empty_content")
@@ -240,6 +241,7 @@ class ConversationService:
                 user_id=user_id,
                 query=content.strip(),
                 top_k=20,
+                document_ids=selected_document_ids,
             )
             context_text, citations = self._context_builder.build_context(retrieved)
 
@@ -317,6 +319,7 @@ class ConversationService:
         user_id: UUID,
         content: str,
         config: LlmModelConfig,
+        selected_document_ids: Sequence[UUID] | None = None,
     ) -> AsyncIterator[Message | LlmUsage | str]:
         if not content.strip():
             raise ValidationError("Message content cannot be empty", "empty_content")
@@ -371,6 +374,7 @@ class ConversationService:
                 user_id=user_id,
                 query=content.strip(),
                 top_k=20,
+                document_ids=selected_document_ids,
             )
             context_text, citations = self._context_builder.build_context(retrieved)
 

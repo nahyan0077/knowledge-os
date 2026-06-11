@@ -45,6 +45,15 @@ export default function ChatWorkspacePage() {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelOption>(MODEL_OPTIONS[0]);
   const [temperature, setTemperature] = useState<number>(0.7);
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+
+  // Fetch Project Documents for selection
+  const { data: documentsData } = useQuery<{ items: any[] }>({
+    queryKey: ['documents', projectId],
+    queryFn: () => apiClient<{ items: any[] }>(`/projects/${projectId}/documents`),
+    enabled: !!projectId,
+  });
+  const documents = documentsData?.items || [];
   
   // Streaming UI State
   const [isStreaming, setIsStreaming] = useState(false);
@@ -122,6 +131,7 @@ export default function ChatWorkspacePage() {
           provider: selectedModel.provider,
           model: selectedModel.name,
           temperature: temperature,
+          selected_document_ids: selectedDocIds.length > 0 ? selectedDocIds : null,
         }),
         signal: abortController.signal,
       });
@@ -438,6 +448,37 @@ export default function ChatWorkspacePage() {
 
       {/* Composer Input Area */}
       <footer className="p-4 border-t border-zinc-900 bg-zinc-950/50 backdrop-blur-md shrink-0">
+        {/* Document Selection Row */}
+        {documents.length > 0 && (
+          <div className="max-w-4xl mx-auto mb-3 flex flex-col gap-1.5">
+            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+              Source Scope: {selectedDocIds.length === 0 ? "Project-wide (All Documents)" : `${selectedDocIds.length} Selected`}
+            </span>
+            <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto py-1">
+              {documents.map((doc) => {
+                const isSelected = selectedDocIds.includes(doc.id);
+                return (
+                  <button
+                    key={doc.id}
+                    onClick={() => {
+                      setSelectedDocIds((prev) =>
+                        isSelected ? prev.filter((id) => id !== doc.id) : [...prev, doc.id]
+                      );
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-200 shadow-[0_0_10px_rgba(99,102,241,0.15)]'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300'
+                    }`}
+                  >
+                    {doc.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="max-w-4xl mx-auto relative flex items-end bg-zinc-900 border border-zinc-800 rounded-2xl focus-within:ring-1 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 transition-all p-2 gap-2">
           <textarea
             rows={1}
