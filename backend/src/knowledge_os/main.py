@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from knowledge_os.api.v1.auth import router as auth_router
+from knowledge_os.api.v1.config import router as config_router
 from knowledge_os.api.v1.conversations import router as conversations_router
 from knowledge_os.api.v1.documents import router as documents_router
 from knowledge_os.api.v1.projects import router as projects_router
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(config_router, prefix="/api/v1")
     app.include_router(projects_router, prefix="/api/v1")
     app.include_router(documents_router, prefix="/api/v1")
     app.include_router(conversations_router, prefix="/api/v1")

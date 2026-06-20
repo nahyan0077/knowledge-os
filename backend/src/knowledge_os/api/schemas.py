@@ -366,3 +366,14 @@ class CitationResponse(BaseModel):
 class RagAskResponse(BaseModel):
     answer: str
     citations: list[CitationResponse]
+
+
+class ModelOptionResponse(BaseModel):
+    provider: str
+    name: str
+    label: str
+
+
+class AvailableModelsResponse(BaseModel):
+    models: list[ModelOptionResponse]
+    default_model: ModelOptionResponse

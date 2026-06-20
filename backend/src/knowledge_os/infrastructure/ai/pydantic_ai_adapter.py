@@ -29,6 +29,7 @@ from knowledge_os.application.ports import (
 
 def _get_model(config: LlmModelConfig) -> Model:
     import os
+
     from knowledge_os.config import get_settings
 
     settings = get_settings()

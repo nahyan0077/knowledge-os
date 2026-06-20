@@ -36,6 +36,7 @@
 ### Sprint 4 (AI Chat Infrastructure using PydanticAI) - Completed
 - **Domain Entities**: `LlmUsage` entity and `LlmUsageRepository`.
 - **API Endpoints**:
+  - `GET /api/v1/config/models` (Get available / configured language models based on active API keys)
   - `POST /api/v1/conversations/{conversation_id}/chat` (Send message and get assistant response)
   - `POST /api/v1/conversations/{conversation_id}/chat/stream` (Send message and stream assistant response via Server-Sent Events (SSE))
 - **AI Adapter & Pricing Engine**: 

@@ -47,6 +47,30 @@ export default function ChatWorkspacePage() {
   const [temperature, setTemperature] = useState<number>(0.7);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
+  // Fetch available models from config
+  const { data: modelsData } = useQuery<{
+    models: ModelOption[];
+    default_model: ModelOption;
+  }>({
+    queryKey: ['available-models'],
+    queryFn: () =>
+      apiClient<{ models: ModelOption[]; default_model: ModelOption }>('/config/models'),
+  });
+
+  const availableModels = modelsData?.models || MODEL_OPTIONS;
+
+  // Set the default model once available models are loaded
+  useEffect(() => {
+    if (modelsData?.default_model) {
+      setSelectedModel((prev) => {
+        if (prev && modelsData.models.some((m) => m.name === prev.name)) {
+          return prev;
+        }
+        return modelsData.default_model;
+      });
+    }
+  }, [modelsData]);
+
   // Fetch Project Documents for selection
   const { data: documentsData } = useQuery<{ items: any[] }>({
     queryKey: ['documents', projectId, organization?.id],
@@ -253,12 +277,12 @@ export default function ChatWorkspacePage() {
             <select
               value={selectedModel.name}
               onChange={(e) => {
-                const opt = MODEL_OPTIONS.find((o) => o.name === e.target.value);
+                const opt = availableModels.find((o) => o.name === e.target.value);
                 if (opt) setSelectedModel(opt);
               }}
               className="bg-zinc-900 text-zinc-100 text-xs px-3 py-1.5 rounded-xl border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
             >
-              {MODEL_OPTIONS.map((opt) => (
+              {availableModels.map((opt) => (
                 <option key={opt.name} value={opt.name}>
                   {opt.label} ({opt.provider})
                 </option>
