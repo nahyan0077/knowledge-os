@@ -193,7 +193,35 @@ export default function ChatWorkspacePage() {
           } else if (cleanLine.startsWith('data:')) {
             const dataStr = cleanLine.substring(5).trim();
             
-            if (currentEvent === 'chunk') {
+            if (currentEvent === 'user_message') {
+              try {
+                const userMsgObj = JSON.parse(dataStr) as Message;
+                queryClient.setQueryData<{ items: Message[] }>(
+                  ['messages', conversationKey(conversationId)],
+                  (old) => {
+                    if (!old) return { items: [userMsgObj] };
+                    if (old.items.some((m) => m.id === userMsgObj.id)) return old;
+                    return { items: [...old.items, userMsgObj] };
+                  }
+                );
+              } catch (e) {
+                console.error('Failed to parse user message event:', e);
+              }
+            } else if (currentEvent === 'assistant_message') {
+              try {
+                const assistantMsgObj = JSON.parse(dataStr) as Message;
+                queryClient.setQueryData<{ items: Message[] }>(
+                  ['messages', conversationKey(conversationId)],
+                  (old) => {
+                    if (!old) return { items: [assistantMsgObj] };
+                    if (old.items.some((m) => m.id === assistantMsgObj.id)) return old;
+                    return { items: [...old.items, assistantMsgObj] };
+                  }
+                );
+              } catch (e) {
+                console.error('Failed to parse assistant message event:', e);
+              }
+            } else if (currentEvent === 'chunk') {
               try {
                 const chunkObj = JSON.parse(dataStr);
                 setStreamContent((prev) => prev + chunkObj.content);
@@ -337,7 +365,9 @@ export default function ChatWorkspacePage() {
           </div>
         ) : (
           <div className="space-y-6 max-w-4xl mx-auto">
-            {messages.map((msg) => {
+            {messages
+              .filter((msg) => msg.status !== 'STREAMING')
+              .map((msg) => {
               const isUser = msg.role === 'user';
               
               return (
