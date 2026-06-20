@@ -227,9 +227,12 @@ class ConversationService:
         async with self._uow_factory() as uow:
             history = await uow.conversations.list_messages(conversation_id, user_id)
 
-        # Exclude empty streaming assistant message from history
+        # Exclude failed, streaming, or current assistant messages from history
         messages_tuples = [
-            (msg.role.value, msg.content) for msg in history if msg.id != assistant_msg.id
+            (msg.role.value, msg.content)
+            for msg in history
+            if msg.id != assistant_msg.id
+            and msg.status not in {MessageStatus.FAILED, MessageStatus.STREAMING}
         ]
 
         # RAG Context retrieval
@@ -360,9 +363,12 @@ class ConversationService:
         async with self._uow_factory() as uow:
             history = await uow.conversations.list_messages(conversation_id, user_id)
 
-        # Exclude empty streaming assistant message from history
+        # Exclude failed, streaming, or current assistant messages from history
         messages_tuples = [
-            (msg.role.value, msg.content) for msg in history if msg.id != assistant_msg.id
+            (msg.role.value, msg.content)
+            for msg in history
+            if msg.id != assistant_msg.id
+            and msg.status not in {MessageStatus.FAILED, MessageStatus.STREAMING}
         ]
 
         # RAG Context retrieval

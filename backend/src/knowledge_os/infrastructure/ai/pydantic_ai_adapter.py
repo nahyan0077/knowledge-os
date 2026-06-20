@@ -82,6 +82,9 @@ class PydanticAiAdapter(ChatAgentPort):
                 history_tuples = messages
 
         ai_history: list[ModelMessage] = []
+        if history_tuples and system_prompt:
+            ai_history.append(ModelRequest(parts=[SystemPromptPart(content=system_prompt)]))
+
         for r, c in history_tuples:
             r_lower = r.lower()
             if r_lower == "user":
@@ -141,6 +144,9 @@ class PydanticAiAdapter(ChatAgentPort):
                 history_tuples = messages
 
         ai_history: list[ModelMessage] = []
+        if history_tuples and system_prompt:
+            ai_history.append(ModelRequest(parts=[SystemPromptPart(content=system_prompt)]))
+
         for r, c in history_tuples:
             r_lower = r.lower()
             if r_lower == "user":
