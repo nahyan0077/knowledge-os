@@ -35,6 +35,9 @@ class FakeBlobStorage:
     async def download(self, blob_path: str) -> bytes:
         return self.files[blob_path]
 
+    async def download_range(self, blob_path: str, start: int, end: int) -> bytes:
+        return self.files[blob_path][start : end + 1]
+
     async def delete(self, blob_path: str) -> None:
         self.files.pop(blob_path, None)
 

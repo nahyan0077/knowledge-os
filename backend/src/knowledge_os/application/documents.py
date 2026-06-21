@@ -189,6 +189,31 @@ class DocumentService:
                 raise NotFoundError("Document not found", "document_not_found")
             return await uow.documents.list_versions(document_id, user_id)
 
+    async def get_version_content(
+        self,
+        version_id: UUID,
+        user_id: UUID,
+        byte_range: tuple[int, int] | None = None,
+    ) -> tuple[DocumentVersion, bytes]:
+        async with self._uow_factory() as uow:
+            version = await uow.documents.get_version_by_id(version_id, user_id)
+            if version is None:
+                raise NotFoundError("Document version not found", "document_version_not_found")
+
+        if byte_range is None:
+            content = await self._storage.download(version.blob_path)
+        else:
+            start, end = byte_range
+            content = await self._storage.download_range(version.blob_path, start, end)
+        return version, content
+
+    async def get_version(self, version_id: UUID, user_id: UUID) -> DocumentVersion:
+        async with self._uow_factory() as uow:
+            version = await uow.documents.get_version_by_id(version_id, user_id)
+            if version is None:
+                raise NotFoundError("Document version not found", "document_version_not_found")
+            return version
+
     async def delete(self, document_id: UUID, user_id: UUID) -> None:
         async with self._uow_factory() as uow:
             document = await uow.documents.get_by_id(document_id, user_id)
