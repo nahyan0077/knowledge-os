@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: knowledge-os-backend
+    plan: free
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    envVars:
+      - key: KNOWLEDGE_OS_DATABASE_URL
+        sync: false
+        placeholder: "postgresql+asyncpg://user:pass@host:port/db (e.g. Supabase, Render Postgres, etc.)"
+      
+      - key: KNOWLEDGE_OS_JWT_SECRET
+        generateValue: true
+      
+      - key: KNOWLEDGE_OS_CORS_ORIGINS
+        value: '["http://localhost:3000", "https://your-frontend-vercel-url.vercel.app"]'
+      
+      - key: KNOWLEDGE_OS_ACCESS_TOKEN_TTL_MINUTES
+        value: "15"
+      
+      - key: KNOWLEDGE_OS_REFRESH_TOKEN_TTL_DAYS
+        value: "30"
+      
+      - key: KNOWLEDGE_OS_SECURE_COOKIES
+        value: "true"
+      
+      - key: KNOWLEDGE_OS_STORAGE_PROVIDER
+        value: "local"  # "local", "azure_blob", or "google_gcs"
+      
+      - key: KNOWLEDGE_OS_EMBEDDING_PROVIDER
+        value: "gemini" # "gemini" or "openai"
+      
+      - key: KNOWLEDGE_OS_GEMINI_API_KEY
+        sync: false
+        placeholder: "Your Gemini API Key"
+      
+      - key: KNOWLEDGE_OS_QDRANT_URL
+        sync: false
+        placeholder: "Your Qdrant instance URL (e.g. Qdrant Cloud)"
+      
+      - key: KNOWLEDGE_OS_QDRANT_API_KEY
+        sync: false
+        placeholder: "Your Qdrant instance API Key (if using Qdrant Cloud)"
+      
+      - key: KNOWLEDGE_OS_TEMPORAL_HOST
+        value: "localhost:7233" # In production, set to your Temporal Cloud or self-hosted Temporal instance
