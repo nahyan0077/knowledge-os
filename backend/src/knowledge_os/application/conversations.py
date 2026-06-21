@@ -1,4 +1,6 @@
 import asyncio
+import builtins
+import re
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any
 from uuid import UUID
@@ -237,7 +239,7 @@ class ConversationService:
 
         # RAG Context retrieval
         context_text = ""
-        citations: list[Citation] = []
+        citations: builtins.list[Citation] = []
         if self._retrieval_service and self._context_builder:
             retrieved = await self._retrieval_service.search(
                 project_id=conversation.project_id,
@@ -249,12 +251,20 @@ class ConversationService:
             context_text, citations = self._context_builder.build_context(retrieved)
 
         if context_text:
+            citation_rules = (
+                "CITATION RULES (follow exactly):\n"
+                "- After each fact, append a bare bracketed number: [1], [2], etc.\n"
+                "- Each citation must be a SINGLE number only. "
+                "Do NOT write [1, 2] or [Source 1] or [1][2].\n"
+                "- If a fact comes from multiple sources, write each separately: [1] [2].\n"
+                "- Only use citation numbers that appear in the context below.\n"
+                "- If the context does not contain the answer, say you do not know.\n"
+            )
             system_prompt = (
                 "You are a helpful assistant. You must answer the user's question "
                 "using only the provided source context.\n"
-                "If the context does not contain the information needed to answer "
-                "the question, state that you do not know.\n\n"
-                f"Context:\n{context_text}"
+                + citation_rules
+                + f"\nContext:\n{context_text}"
             )
         else:
             system_prompt = "You are a helpful assistant."
@@ -266,6 +276,7 @@ class ConversationService:
             status = MessageStatus.COMPLETE
             content_out = response.content
             metrics = response.usage
+            content_out, citations = self._process_citations(content_out, citations)
         except Exception:
             async with self._uow_factory() as uow:
                 assistant_msg.content = ""
@@ -287,6 +298,13 @@ class ConversationService:
                             "document_version_id": str(cit.document_version_id),
                             "chunk_number": cit.chunk_number,
                             "score": cit.score,
+                            "page_start": cit.page_start,
+                            "page_end": cit.page_end,
+                            "quote": cit.quote,
+                            "citation_number": cit.citation_number,
+                            "document_id": str(cit.document_id) if cit.document_id else None,
+                            "document_name": cit.document_name,
+                            "source_filename": cit.source_filename,
                         }
                         for cit in citations
                     ]
@@ -373,7 +391,7 @@ class ConversationService:
 
         # RAG Context retrieval
         context_text = ""
-        citations: list[Citation] = []
+        citations: builtins.list[Citation] = []
         if self._retrieval_service and self._context_builder:
             retrieved = await self._retrieval_service.search(
                 project_id=conversation.project_id,
@@ -385,12 +403,20 @@ class ConversationService:
             context_text, citations = self._context_builder.build_context(retrieved)
 
         if context_text:
+            citation_rules = (
+                "CITATION RULES (follow exactly):\n"
+                "- After each fact, append a bare bracketed number: [1], [2], etc.\n"
+                "- Each citation must be a SINGLE number only. "
+                "Do NOT write [1, 2] or [Source 1] or [1][2].\n"
+                "- If a fact comes from multiple sources, write each separately: [1] [2].\n"
+                "- Only use citation numbers that appear in the context below.\n"
+                "- If the context does not contain the answer, say you do not know.\n"
+            )
             system_prompt = (
                 "You are a helpful assistant. You must answer the user's question "
                 "using only the provided source context.\n"
-                "If the context does not contain the information needed to answer "
-                "the question, state that you do not know.\n\n"
-                f"Context:\n{context_text}"
+                + citation_rules
+                + f"\nContext:\n{context_text}"
             )
         else:
             system_prompt = "You are a helpful assistant."
@@ -432,9 +458,12 @@ class ConversationService:
                     )
 
                 async with self._uow_factory() as uow:
-                    assistant_msg.content = full_content
+                    final_content, final_citations = self._process_citations(
+                        full_content, citations
+                    )
+                    assistant_msg.content = final_content
                     assistant_msg.status = status
-                    if citations:
+                    if final_citations:
                         assistant_msg.metadata = {
                             "citations": [
                                 {
@@ -442,8 +471,17 @@ class ConversationService:
                                     "document_version_id": str(cit.document_version_id),
                                     "chunk_number": cit.chunk_number,
                                     "score": cit.score,
+                                    "page_start": cit.page_start,
+                                    "page_end": cit.page_end,
+                                    "quote": cit.quote,
+                                    "citation_number": cit.citation_number,
+                                    "document_id": (
+                                        str(cit.document_id) if cit.document_id else None
+                                    ),
+                                    "document_name": cit.document_name,
+                                    "source_filename": cit.source_filename,
                                 }
-                                for cit in citations
+                                for cit in final_citations
                             ]
                         }
                     await uow.conversations.save_message(assistant_msg)
@@ -483,3 +521,85 @@ class ConversationService:
                 "Conversation title must contain 1-255 characters", "invalid_title"
             )
         return clean
+
+    @staticmethod
+    def _normalize_citation_brackets(content: str) -> str:
+        """Normalize non-standard LLM citation formats to bare [N] tokens.
+
+        Handles:
+        - [Source N]  -> [N]
+        - [N, M, ...]  -> [N] [M] ...
+        - [Source N, M]  -> [N] [M]
+        """
+        # [Source N] or [source N] -> [N]
+        content = re.sub(
+            r"\[\s*[Ss]ource\s+(\d+)\s*\]",
+            lambda m: f"[{m.group(1)}]",
+            content,
+        )
+        # [Source N, M, ...] -> [N] [M] ...
+        content = re.sub(
+            r"\[\s*[Ss]ource\s+([\d,\s]+)\]",
+            lambda m: " ".join(f"[{n.strip()}]" for n in m.group(1).split(",") if n.strip()),
+            content,
+        )
+        # [N, M, ...] -> [N] [M] ...
+        content = re.sub(
+            r"\[([\d,\s]+)\]",
+            lambda m: " ".join(f"[{n.strip()}]" for n in m.group(1).split(",") if n.strip()),
+            content,
+        )
+        return content
+
+    @staticmethod
+    def _process_citations(
+        content: str, retrieved_citations: builtins.list[Citation]
+    ) -> tuple[str, builtins.list[Citation]]:
+        if not retrieved_citations:
+            return content, []
+
+        # Normalize LLM citation variants to bare [N] format before processing
+        content = ConversationService._normalize_citation_brackets(content)
+
+        matches = re.findall(r"\[(\d+)\]", content)
+
+        mapping = {}
+        new_citations = []
+        next_id = 1
+
+        for m in matches:
+            old_num = int(m)
+            matched_cit = next(
+                (c for c in retrieved_citations if c.citation_number == old_num),
+                None,
+            )
+            if matched_cit and old_num not in mapping:
+                mapping[old_num] = next_id
+                new_cit = Citation(
+                    chunk_id=matched_cit.chunk_id,
+                    document_version_id=matched_cit.document_version_id,
+                    chunk_number=matched_cit.chunk_number,
+                    score=matched_cit.score,
+                    page_start=matched_cit.page_start,
+                    page_end=matched_cit.page_end,
+                    quote=matched_cit.quote,
+                    citation_number=next_id,
+                    document_id=matched_cit.document_id,
+                    document_name=matched_cit.document_name,
+                    source_filename=matched_cit.source_filename,
+                )
+                new_citations.append(new_cit)
+                next_id += 1
+
+        def replace_match(match: re.Match[str]) -> str:
+            num = int(match.group(1))
+            if num in mapping:
+                return f"[{mapping[num]}]"
+            return ""
+
+        new_content = re.sub(r"\[(\d+)\]", replace_match, content)
+
+        # Cleanup extra spacing or orphaned punctuation
+        new_content = re.sub(r" {2,}", " ", new_content)
+        new_content = re.sub(r"\s+([.,;:?!])", r"\1", new_content).strip()
+        return new_content, new_citations
