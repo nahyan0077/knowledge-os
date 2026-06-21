@@ -36,7 +36,10 @@ class PdfTextExtractor:
                     logging.getLogger(__name__).warning(f"Failed to extract page: {e}")
                     pages_text.append("")
 
-            full_text = "\n".join(pages_text)
+            # Form-feed is an internal, durable page boundary in the extracted-text
+            # artifact. It survives storage while keeping page-aware chunking
+            # independent of the PDF parser.
+            full_text = "\f".join(pages_text)
             return ExtractionResult(
                 text=full_text,
                 page_count=page_count,
@@ -119,10 +122,26 @@ class TextChunker:
         if not text:
             return []
 
-        chunks = []
+        chunks: list[dict[str, Any]] = []
+        page_offset = 0
+        chunk_index = 0
+
+        for page_number, page_text in enumerate(text.split("\f"), start=1):
+            chunk_index = self._chunk_page(page_text, page_number, page_offset, chunk_index, chunks)
+            page_offset += len(page_text) + 1
+
+        return chunks
+
+    def _chunk_page(
+        self,
+        text: str,
+        page_number: int,
+        page_offset: int,
+        chunk_index: int,
+        chunks: list[dict[str, Any]],
+    ) -> int:
         text_len = len(text)
         start = 0
-        chunk_index = 0
 
         while start < text_len:
             end = min(start + self.chunk_size, text_len)
@@ -143,6 +162,8 @@ class TextChunker:
                         "char_offset": start,
                         "token_count": token_count,
                         "char_count": len(content),
+                        "page_start": page_number,
+                        "page_end": page_number,
                     }
                 )
                 chunk_index += 1
@@ -153,4 +174,4 @@ class TextChunker:
             if start < 0:
                 start = 0
 
-        return chunks
+        return chunk_index

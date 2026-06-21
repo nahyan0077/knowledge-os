@@ -47,7 +47,7 @@ def test_pdf_extractor_success(monkeypatch: pytest.MonkeyPatch) -> None:
     result = extractor.extract(b"dummy pdf bytes")
 
     assert result.page_count == 2
-    assert result.text == "Page 1 Content\nPage 2 Content"
+    assert result.text == "Page 1 Content\fPage 2 Content"
     assert result.extracted_characters == len(result.text)
 
 
@@ -67,7 +67,7 @@ def test_pdf_extractor_empty_pages(monkeypatch: pytest.MonkeyPatch) -> None:
     result = extractor.extract(b"dummy pdf bytes")
 
     assert result.page_count == 3
-    assert result.text == "Page 1 Content\n\n"
+    assert result.text == "Page 1 Content\f\f"
     assert result.extracted_characters == len(result.text)
 
 
@@ -102,7 +102,7 @@ def test_pdf_extractor_with_real_empty_pdf() -> None:
     result = extractor.extract(pdf_bytes)
 
     assert result.page_count == 2
-    assert result.text == "\n"
+    assert result.text == "\f"
     assert result.extracted_characters == 1
 
 
