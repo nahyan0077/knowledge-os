@@ -44,6 +44,14 @@ class GcsStorageAdapter(BlobStoragePort):
 
         return await asyncio.to_thread(_download)
 
+    async def download_range(self, blob_path: str, start: int, end: int) -> bytes:
+        def _download_range() -> bytes:
+            bucket = self.client.bucket(self._bucket_name)
+            blob = bucket.blob(blob_path)
+            return cast(bytes, blob.download_as_bytes(start=start, end=end))
+
+        return await asyncio.to_thread(_download_range)
+
     async def delete(self, blob_path: str) -> None:
         def _delete() -> None:
             bucket = self.client.bucket(self._bucket_name)
