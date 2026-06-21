@@ -40,6 +40,10 @@ class BlobStoragePort(Protocol):
         """Downloads file data and returns binary data."""
         ...
 
+    async def download_range(self, blob_path: str, start: int, end: int) -> bytes:
+        """Downloads the inclusive byte range [start, end]."""
+        ...
+
     async def delete(self, blob_path: str) -> None:
         """Deletes file data from storage."""
         ...

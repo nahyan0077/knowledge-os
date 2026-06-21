@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/shared/lib/store';
 import { apiClient } from '@/shared/api/client';
 import { Document, DocumentListResponse, DocumentVersion } from '@/shared/types';
+import { PdfViewer } from '@/shared/ui/PdfViewer';
 import { useParams } from 'next/navigation';
 import {
   FileText,
@@ -17,6 +18,7 @@ import {
   FileDown,
   Layers,
   CheckCircle,
+  Eye,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -40,6 +42,7 @@ export default function DocumentExplorerPage() {
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [versionFile, setVersionFile] = useState<File | null>(null);
   const [versionFileError, setVersionFileError] = useState<string | null>(null);
+  const [viewedVersion, setViewedVersion] = useState<DocumentVersion | null>(null);
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<UploadFormValues>({
     resolver: zodResolver(uploadSchema),
@@ -423,6 +426,15 @@ export default function DocumentExplorerPage() {
                           </span>
                         </div>
                       </div>
+                      {ver.mime_type === 'application/pdf' && (
+                        <button
+                          type="button"
+                          onClick={() => setViewedVersion(ver)}
+                          className="mt-1 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-indigo-700 hover:text-indigo-300"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View PDF
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -430,6 +442,13 @@ export default function DocumentExplorerPage() {
             </div>
           </div>
         </div>
+      )}
+      {viewedVersion && (
+        <PdfViewer
+          versionId={viewedVersion.id}
+          filename={viewedVersion.source_filename}
+          onClose={() => setViewedVersion(null)}
+        />
       )}
     </div>
   );

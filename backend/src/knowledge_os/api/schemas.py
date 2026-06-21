@@ -365,6 +365,13 @@ class CitationResponse(BaseModel):
     document_version_id: UUID
     chunk_number: int
     score: float
+    page_start: int | None = None
+    page_end: int | None = None
+    quote: str | None = None
+    citation_number: int | None = None
+    document_id: UUID | None = None
+    document_name: str | None = None
+    source_filename: str | None = None
 
 
 class RagAskResponse(BaseModel):

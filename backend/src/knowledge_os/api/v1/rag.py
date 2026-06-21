@@ -29,6 +29,13 @@ async def ask_rag(
                 document_version_id=cit.document_version_id,
                 chunk_number=cit.chunk_number,
                 score=cit.score,
+                page_start=cit.page_start,
+                page_end=cit.page_end,
+                quote=cit.quote,
+                citation_number=cit.citation_number,
+                document_id=cit.document_id,
+                document_name=cit.document_name,
+                source_filename=cit.source_filename,
             )
             for cit in citations
         ],

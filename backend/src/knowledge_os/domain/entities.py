@@ -236,6 +236,8 @@ class DocumentChunk:
     char_offset: int
     token_count: int
     char_count: int
+    page_start: int | None = None
+    page_end: int | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utc_now)
 
@@ -260,3 +262,10 @@ class Citation:
     document_version_id: UUID
     chunk_number: int
     score: float
+    page_start: int | None = None
+    page_end: int | None = None
+    quote: str | None = None
+    citation_number: int | None = None
+    document_id: UUID | None = None
+    document_name: str | None = None
+    source_filename: str | None = None

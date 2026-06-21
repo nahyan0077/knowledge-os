@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/shared/lib/store';
-import { apiClient } from '@/shared/api/client';
-import { Message, MessageStatus, MessageRole, LlmUsage } from '@/shared/types';
+import { apiClient, fetchAuthenticatedStream } from '@/shared/api/client';
+import { Citation, Message, MessageStatus, MessageRole, LlmUsage } from '@/shared/types';
+import { PdfViewer } from '@/shared/ui/PdfViewer';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Send,
@@ -17,6 +18,7 @@ import {
   RefreshCw,
   StopCircle,
   CornerDownLeft,
+  BookOpen,
 } from 'lucide-react';
 
 interface ModelOption {
@@ -46,6 +48,85 @@ export default function ChatWorkspacePage() {
   const [selectedModel, setSelectedModel] = useState<ModelOption>(MODEL_OPTIONS[0]);
   const [temperature, setTemperature] = useState<number>(0.7);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+
+  // Render a single text segment with inline bold and citation badges
+  const renderSegment = (text: string, citations: Citation[], keyPrefix: string): React.ReactNode[] => {
+    // Split on **bold** and [N] citation patterns
+    const tokenRegex = /(\*\*[^*]+\*\*|\[\d+\])/g;
+    const tokens = text.split(tokenRegex);
+    return tokens.map((token, i) => {
+      if (/^\*\*[^*]+\*\*$/.test(token)) {
+        return <strong key={`${keyPrefix}-b-${i}`}>{token.slice(2, -2)}</strong>;
+      }
+      const citMatch = token.match(/^\[(\d+)\]$/);
+      if (citMatch) {
+        const num = parseInt(citMatch[1], 10);
+        const citation = citations.find((c) => c.citation_number === num);
+        if (citation) {
+          return (
+            <button
+              key={`${keyPrefix}-cit-${i}`}
+              type="button"
+              onClick={() => setSelectedCitation(citation)}
+              className="mx-0.5 inline-flex items-center justify-center rounded-md bg-indigo-500/10 hover:bg-indigo-500/25 border border-indigo-500/35 px-1.5 py-0.5 text-[9px] font-extrabold text-indigo-300 hover:text-indigo-200 transition-all align-middle select-none cursor-pointer"
+              title={citation.source_filename || citation.document_name || `Source ${num}`}
+            >
+              {num}
+            </button>
+          );
+        }
+      }
+      return token ? <React.Fragment key={`${keyPrefix}-t-${i}`}>{token}</React.Fragment> : null;
+    }).filter(Boolean) as React.ReactNode[];
+  };
+
+  const renderContentWithCitations = (content: string, citations?: Citation[]) => {
+    const cits = citations || [];
+    // Split content into lines for paragraph/bullet rendering
+    const lines = content.split('\n');
+    const blocks: React.ReactNode[] = [];
+    let paraLines: string[] = [];
+
+    const flushPara = (key: string) => {
+      if (paraLines.length === 0) return;
+      const combined = paraLines.join(' ');
+      blocks.push(
+        <p key={key} className="mb-2 last:mb-0 leading-relaxed">
+          {renderSegment(combined, cits, key)}
+        </p>
+      );
+      paraLines = [];
+    };
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      // Blank line → flush paragraph
+      if (trimmed === '') {
+        flushPara(`p-${idx}`);
+        return;
+      }
+      // Bullet item (starts with * or -)
+      if (/^[*\-•]\s+/.test(trimmed)) {
+        flushPara(`p-${idx}`);
+        const bulletText = trimmed.replace(/^[*\-•]\s+/, '');
+        blocks.push(
+          <div key={`li-${idx}`} className="flex gap-2 mb-1.5">
+            <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
+            <span className="leading-relaxed">
+              {renderSegment(bulletText, cits, `li-${idx}`)}
+            </span>
+          </div>
+        );
+        return;
+      }
+      paraLines.push(trimmed);
+    });
+    flushPara(`p-final`);
+
+    return <div className="space-y-0.5">{blocks}</div>;
+  };
+
 
   // Fetch available models from config
   const { data: modelsData } = useQuery<{
@@ -142,16 +223,9 @@ export default function ChatWorkspacePage() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    // Optimistically invalidate cache so we fetch history after streaming finishes
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/conversations/${conversationId}/chat/stream`, {
+      const stream = await fetchAuthenticatedStream(`/conversations/${conversationId}/chat/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
         body: JSON.stringify({
           content: trimmedText,
           provider: selectedModel.provider,
@@ -162,12 +236,7 @@ export default function ChatWorkspacePage() {
         signal: abortController.signal,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Readable stream not supported');
+      const reader = stream.getReader();
 
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
@@ -214,7 +283,13 @@ export default function ChatWorkspacePage() {
                   ['messages', conversationKey(conversationId)],
                   (old) => {
                     if (!old) return { items: [assistantMsgObj] };
-                    if (old.items.some((m) => m.id === assistantMsgObj.id)) return old;
+                    if (old.items.some((m) => m.id === assistantMsgObj.id)) {
+                      return {
+                        items: old.items.map((m) =>
+                          m.id === assistantMsgObj.id ? assistantMsgObj : m
+                        ),
+                      };
+                    }
                     return { items: [...old.items, assistantMsgObj] };
                   }
                 );
@@ -390,7 +465,26 @@ export default function ChatWorkspacePage() {
                           : 'bg-zinc-900/40 border border-zinc-900 text-zinc-200 rounded-tl-none'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      {renderContentWithCitations(msg.content, msg.metadata?.citations)}
+
+                      {!isUser && msg.metadata?.citations && msg.metadata.citations.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-zinc-800/80 pt-3">
+                          {msg.metadata.citations.map((citation, index) => (
+                            <button
+                              key={citation.chunk_id}
+                              type="button"
+                              onClick={() => setSelectedCitation(citation)}
+                              className="flex items-center gap-1.5 rounded-full border border-indigo-800/70 bg-indigo-950/40 px-2.5 py-1 text-[10px] font-semibold text-indigo-200 hover:bg-indigo-900/50 animate-fade-in"
+                              aria-label={`Open source ${citation.citation_number || index + 1}${citation.page_start ? ` on page ${citation.page_start}` : ''}`}
+                            >
+                              <BookOpen className="h-3 w-3" />
+                              Source {citation.citation_number || index + 1}
+                              {citation.source_filename ? ` · ${citation.source_filename}` : ''}
+                              {citation.page_start ? ` · p. ${citation.page_start}` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Display warning/retry for failed message */}
                       {!isUser && msg.status === 'FAILED' && (
@@ -497,6 +591,21 @@ export default function ChatWorkspacePage() {
                 </div>
               </div>
             )}
+
+            {/* Persistent Stream Error Display */}
+            {!isStreaming && streamError && (
+              <div className="flex gap-4 justify-start max-w-4xl mx-auto">
+                <div className="h-8 w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-red-400 shrink-0 shadow-md">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col max-w-[80%] items-start">
+                  <div className="p-4 rounded-2xl text-sm leading-relaxed bg-red-950/10 border border-red-900/50 text-red-200 rounded-tl-none">
+                    <span className="font-bold text-red-300 block mb-1 uppercase tracking-wider text-[10px]">Connection Error</span>
+                    <p className="text-xs text-red-400/90">{streamError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -570,6 +679,14 @@ export default function ChatWorkspacePage() {
           <span>Knowledge-grounded response</span>
         </div>
       </footer>
+      {selectedCitation && (
+        <PdfViewer
+          versionId={selectedCitation.document_version_id}
+          filename={selectedCitation.source_filename || selectedCitation.document_name || "Cited source PDF"}
+          citation={selectedCitation}
+          onClose={() => setSelectedCitation(null)}
+        />
+      )}
     </div>
   );
 }

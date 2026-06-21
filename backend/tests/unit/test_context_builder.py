@@ -23,7 +23,7 @@ def test_context_builder_basic() -> None:
     context, citations = builder.build_context(chunks)
 
     assert "Hello world from chunk 1" in context
-    assert f"Source Document Version: {version_id_1} (Chunk: 1)" in context
+    assert f"Source [1] Document Version: {version_id_1} (Chunk: 1)" in context
     assert len(citations) == 1
     assert citations[0].chunk_id == chunk_id_1
     assert citations[0].document_version_id == version_id_1
@@ -58,7 +58,7 @@ def test_context_builder_deduplication() -> None:
     context, citations = builder.build_context(chunks)
 
     # Check that there is only one chunk in context and citations
-    assert context.count("Source Document Version:") == 1
+    assert context.count("Source [") == 1
     assert len(citations) == 1
     assert citations[0].score == 0.9  # Highest score kept
 

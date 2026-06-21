@@ -68,6 +68,26 @@ class AzureBlobStorageAdapter:
 
             return await asyncio.to_thread(_download)
 
+    async def download_range(self, blob_path: str, start: int, end: int) -> bytes:
+        if not self.client:
+            file_path = self._local_storage_dir / blob_path
+
+            def _read_range() -> bytes:
+                with file_path.open("rb") as file:
+                    file.seek(start)
+                    return file.read(end - start + 1)
+
+            return await asyncio.to_thread(_read_range)
+
+        container_client = self.client.get_container_client(self.container_name)
+        blob_client = container_client.get_blob_client(blob_path)
+
+        def _download_range() -> bytes:
+            stream = blob_client.download_blob(offset=start, length=end - start + 1)
+            return bytes(stream.readall())
+
+        return await asyncio.to_thread(_download_range)
+
     async def delete(self, blob_path: str) -> None:
         if not self.client:
             file_path = self._local_storage_dir / blob_path

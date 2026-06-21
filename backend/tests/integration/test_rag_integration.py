@@ -169,11 +169,13 @@ async def test_rag_integration_e2e(db_session) -> None:
             self.session = db_session
             from knowledge_os.infrastructure.repositories.sqlalchemy import (
                 SqlAlchemyDocumentChunkRepository,
+                SqlAlchemyDocumentRepository,
                 SqlAlchemyProjectRepository,
             )
 
             self.projects = SqlAlchemyProjectRepository(self.session)
             self.document_chunks = SqlAlchemyDocumentChunkRepository(self.session)
+            self.documents = SqlAlchemyDocumentRepository(self.session)
             return self
 
         async def __aexit__(self, exc_type, exc_val, exc_tb):

@@ -1,7 +1,8 @@
 from typing import Annotated
+from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile, status
 
 from knowledge_os.api.dependencies import get_current_user_id, get_document_service
 from knowledge_os.api.schemas import (
@@ -107,3 +108,51 @@ async def list_document_versions(
 ) -> list[DocumentVersionResponse]:
     versions = await service.list_versions(document_id, user_id)
     return [DocumentVersionResponse.from_domain(v) for v in versions]
+
+
+def _parse_range_header(value: str | None, size: int) -> tuple[int, int] | None:
+    if value is None or not value.startswith("bytes=") or "," in value:
+        return None
+    start_text, separator, end_text = value.removeprefix("bytes=").partition("-")
+    if not separator or not start_text.isdigit():
+        return None
+    start = int(start_text)
+    end = int(end_text) if end_text.isdigit() else size - 1
+    if start >= size or end < start:
+        return None
+    return start, min(end, size - 1)
+
+
+@router.get("/document-versions/{version_id}/content")
+async def get_document_version_content(
+    version_id: UUID,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[DocumentService, Depends(get_document_service)],
+    range_header: Annotated[str | None, Header(alias="Range")] = None,
+) -> Response:
+    version = await service.get_version(version_id, user_id)
+    selected_range = _parse_range_header(range_header, version.size_bytes)
+    if range_header is not None and selected_range is None:
+        return Response(
+            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            headers={"Content-Range": f"bytes */{version.size_bytes}"},
+        )
+    version, content = await service.get_version_content(version_id, user_id, selected_range)
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f"inline; filename*=UTF-8''{quote(version.source_filename)}",
+        "ETag": version.etag,
+        "Cache-Control": "private, max-age=0, must-revalidate",
+    }
+    response_status = status.HTTP_200_OK
+    if selected_range is not None:
+        start, end = selected_range
+        headers["Content-Range"] = f"bytes {start}-{end}/{version.size_bytes}"
+        response_status = status.HTTP_206_PARTIAL_CONTENT
+    return Response(
+        content=content,
+        status_code=response_status,
+        media_type=version.mime_type,
+        headers=headers,
+    )

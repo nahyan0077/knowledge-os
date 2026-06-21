@@ -75,6 +75,26 @@ export interface DocumentVersion {
   updated_at: string;
 }
 
+export interface Citation {
+  chunk_id: string;
+  document_version_id: string;
+  chunk_number: number;
+  score: number;
+  page_start: number | null;
+  page_end: number | null;
+  quote: string | null;
+  citation_number?: number;
+  document_id?: string | null;
+  document_name?: string | null;
+  source_filename?: string | null;
+}
+
+export interface MessageMetadata {
+  citations?: Citation[];
+  usage?: LlmUsage;
+  [key: string]: unknown;
+}
+
 export type MessageStatus = 'STREAMING' | 'COMPLETE' | 'INTERRUPTED' | 'FAILED';
 export type MessageRole = 'user' | 'assistant' | 'system';
 
@@ -83,7 +103,7 @@ export interface Message {
   conversation_id: string;
   role: MessageRole;
   content: string;
-  metadata: Record<string, any>;
+  metadata: MessageMetadata;
   status: MessageStatus;
   sequence_number: number;
   created_at: string;

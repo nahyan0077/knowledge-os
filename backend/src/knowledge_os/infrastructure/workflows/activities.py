@@ -299,6 +299,8 @@ async def chunk_document(payload: dict[str, Any]) -> dict[str, Any]:
             char_offset=c["char_offset"],
             token_count=c["token_count"],
             char_count=c["char_count"],
+            page_start=c["page_start"] if version.mime_type == "application/pdf" else None,
+            page_end=c["page_end"] if version.mime_type == "application/pdf" else None,
         )
         for c in chunks_data
     ]
