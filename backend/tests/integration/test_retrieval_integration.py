@@ -256,11 +256,13 @@ async def test_retrieval_integration_with_db_hydration_and_tenant_isolation(
             # Override repositories to use the active session
             from knowledge_os.infrastructure.repositories.sqlalchemy import (
                 SqlAlchemyDocumentChunkRepository,
+                SqlAlchemyDocumentRepository,
                 SqlAlchemyProjectRepository,
             )
 
             self.projects = SqlAlchemyProjectRepository(self.session)
             self.document_chunks = SqlAlchemyDocumentChunkRepository(self.session)
+            self.documents = SqlAlchemyDocumentRepository(self.session)
             return self
 
         async def __aexit__(self, exc_type, exc_val, exc_tb):

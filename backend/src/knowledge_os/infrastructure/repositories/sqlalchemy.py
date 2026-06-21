@@ -833,6 +833,8 @@ def to_document_chunk(row: DocumentChunkModel) -> DocumentChunk:
         char_offset=row.char_offset,
         token_count=row.token_count,
         char_count=row.char_count,
+        page_start=row.page_start,
+        page_end=row.page_end,
         created_at=row.created_at,
     )
 
@@ -854,6 +856,8 @@ class SqlAlchemyDocumentChunkRepository:
                     char_offset=chunk.char_offset,
                     token_count=chunk.token_count,
                     char_count=chunk.char_count,
+                    page_start=chunk.page_start,
+                    page_end=chunk.page_end,
                     created_at=chunk.created_at,
                 )
             )

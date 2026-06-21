@@ -41,9 +41,9 @@ class ContextBuilder:
         context_parts = []
         citations = []
 
-        for chunk in selected_chunks:
+        for citation_number, chunk in enumerate(selected_chunks, start=1):
             formatted_chunk = (
-                f"Source Document Version: {chunk.document_version_id} "
+                f"Source [{citation_number}] Document Version: {chunk.document_version_id} "
                 f"(Chunk: {chunk.chunk_number})\n"
                 f"{chunk.content}\n"
                 f"---\n"
@@ -56,6 +56,13 @@ class ContextBuilder:
                     document_version_id=chunk.document_version_id,
                     chunk_number=chunk.chunk_number,
                     score=chunk.score,
+                    page_start=chunk.page_start,
+                    page_end=chunk.page_end,
+                    quote=chunk.content[:500],
+                    citation_number=citation_number,
+                    document_id=chunk.document_id,
+                    document_name=chunk.document_name,
+                    source_filename=chunk.source_filename,
                 )
             )
 

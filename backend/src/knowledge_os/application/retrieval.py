@@ -15,6 +15,11 @@ class ScoredChunk:
     document_version_id: UUID
     chunk_number: int
     token_count: int
+    page_start: int | None = None
+    page_end: int | None = None
+    document_id: UUID | None = None
+    document_name: str | None = None
+    source_filename: str | None = None
 
 
 class RetrievalService:
@@ -83,6 +88,23 @@ class RetrievalService:
         async with self._uow_factory() as uow:
             chunks = await uow.document_chunks.list_by_ids(chunk_ids)
 
+            # Fetch all distinct document_ids and version_ids to map metadata
+            doc_ids = list({c.document_id for c in chunks})
+            version_ids = list({c.version_id for c in chunks})
+
+            documents_map = {}
+            versions_map = {}
+
+            for doc_id in doc_ids:
+                doc = await uow.documents.get_by_id(doc_id, user_id)
+                if doc:
+                    documents_map[doc_id] = doc
+
+            for v_id in version_ids:
+                ver = await uow.documents.get_version_by_id(v_id, user_id)
+                if ver:
+                    versions_map[v_id] = ver
+
         # 5. Build results, preserving Qdrant search score order
         scored_chunks = []
         for chunk in chunks:
@@ -90,6 +112,8 @@ class RetrievalService:
             if chunk.organization_id != organization_id:
                 continue
             score = scores_map.get(chunk.id, 0.0)
+            doc = documents_map.get(chunk.document_id)
+            ver = versions_map.get(chunk.version_id)
             scored_chunks.append(
                 ScoredChunk(
                     chunk_id=chunk.id,
@@ -98,6 +122,11 @@ class RetrievalService:
                     document_version_id=chunk.version_id,
                     chunk_number=chunk.chunk_index,
                     token_count=chunk.token_count,
+                    page_start=chunk.page_start,
+                    page_end=chunk.page_end,
+                    document_id=chunk.document_id,
+                    document_name=doc.name if doc else None,
+                    source_filename=ver.source_filename if ver else None,
                 )
             )
 
