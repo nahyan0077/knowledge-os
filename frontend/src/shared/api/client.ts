@@ -148,6 +148,140 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
   return response.json();
 }
 
+export async function fetchAuthenticatedBlob(path: string): Promise<Blob> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  return response.blob();
+}
+
+export async function fetchAuthenticatedStream(
+  path: string,
+  options: RequestOptions = {}
+): Promise<ReadableStream<Uint8Array>> {
+  const { params, skipAuth, ...init } = options;
+
+  let url = `${API_BASE_URL}/api/v1${path}`;
+  if (params) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined) {
+        searchParams.append(key, String(val));
+      }
+    });
+    const queryString = searchParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+  }
+
+  const headers = new Headers(init.headers);
+  if (!skipAuth) {
+    const token = useAuthStore.getState().accessToken;
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
+  if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(url, {
+    ...init,
+    headers,
+  });
+
+  if (response.status === 401 && !skipAuth && path !== '/auth/refresh') {
+    if (isRefreshing) {
+      return new Promise<ReadableStream<Uint8Array>>((resolve, reject) => {
+        subscribeTokenRefresh(async (newToken) => {
+          try {
+            headers.set('Authorization', `Bearer ${newToken}`);
+            const res = await fetch(url, { ...init, headers });
+            if (!res.ok) {
+              reject(await parseError(res));
+              return;
+            }
+            if (!res.body) {
+              reject(new Error('Response body is empty'));
+              return;
+            }
+            resolve(res.body);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      });
+    }
+
+    isRefreshing = true;
+
+    try {
+      const refreshRes = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!refreshRes.ok) {
+        useAuthStore.getState().logout();
+        throw new Error('Session expired. Please log in again.');
+      }
+
+      const refreshData = await refreshRes.json();
+      const newAccessToken = refreshData.access_token;
+      
+      const user = {
+        id: refreshData.user.id,
+        email: refreshData.user.email,
+        displayName: refreshData.user.display_name,
+      };
+      
+      const org = refreshData.organization ? {
+        id: refreshData.organization.id,
+        name: refreshData.organization.name,
+        slug: refreshData.organization.slug,
+        type: refreshData.organization.type,
+      } : null;
+
+      useAuthStore.getState().login(newAccessToken, user, org);
+      isRefreshing = false;
+      onRefreshed(newAccessToken);
+
+      headers.set('Authorization', `Bearer ${newAccessToken}`);
+      const retryResponse = await fetch(url, { ...init, headers });
+      if (!retryResponse.ok) {
+        throw await parseError(retryResponse);
+      }
+      if (!retryResponse.body) {
+        throw new Error('Response body is empty');
+      }
+      return retryResponse.body;
+    } catch (err) {
+      isRefreshing = false;
+      refreshSubscribers = [];
+      useAuthStore.getState().logout();
+      throw err;
+    }
+  }
+
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+
+  if (!response.body) {
+    throw new Error('Response body is empty');
+  }
+
+  return response.body;
+}
+
 async function parseError(response: Response): Promise<ApiError> {
   try {
     const errorJson = await response.json();
