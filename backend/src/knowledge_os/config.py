@@ -1,6 +1,7 @@
 from functools import lru_cache
+from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,18 @@ class Settings(BaseSettings):
     app_name: str = "Knowledge OS API"
     environment: str = "development"
     database_url: str = "postgresql+asyncpg://knowledge_os:knowledge_os@localhost:5432/knowledge_os"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            # Normalizes postgres:// and postgresql:// to use the asyncpg driver
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
