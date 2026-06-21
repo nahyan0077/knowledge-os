@@ -150,3 +150,11 @@ class VectorStorePort(Protocol):
         top_k: int = 10,
         document_version_ids: list[UUID] | None = None,
     ) -> list[tuple[UUID, float]]: ...
+
+
+class IdentityProviderPort(Protocol):
+    async def verify_id_token(self, id_token: str) -> dict[str, Any]:
+        """Verifies the OAuth ID token and returns payload containing email,
+        name, and subject identifier.
+        """
+        ...

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Cookie, Depends, Response, status
 from knowledge_os.api.dependencies import get_auth_service
 from knowledge_os.api.schemas import (
     AuthResponse,
+    GoogleLoginRequest,
     LoginRequest,
     OrganizationResponse,
     RegisterRequest,
@@ -60,6 +61,17 @@ async def login(
     service: Annotated[AuthService, Depends(get_auth_service)],
 ) -> AuthResponse:
     result = await service.login(payload.email, payload.password)
+    _set_refresh_cookie(response, result.refresh_token)
+    return _response(result)
+
+
+@router.post("/google", response_model=AuthResponse)
+async def google_login(
+    payload: GoogleLoginRequest,
+    response: Response,
+    service: Annotated[AuthService, Depends(get_auth_service)],
+) -> AuthResponse:
+    result = await service.login_with_google(payload.id_token)
     _set_refresh_cookie(response, result.refresh_token)
     return _response(result)
 

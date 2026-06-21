@@ -29,6 +29,10 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=256)
 
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(min_length=1)
+
+
 class UserResponse(BaseModel):
     id: UUID
     email: str

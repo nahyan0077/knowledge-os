@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from knowledge_os.application.ports import (
     AccessTokenService,
+    IdentityProviderPort,
     IssuedAccessToken,
     PasswordService,
     RefreshTokenService,
@@ -42,12 +43,14 @@ class AuthService:
         access_tokens: AccessTokenService,
         refresh_tokens: RefreshTokenService,
         refresh_ttl_days: int,
+        identity_provider: IdentityProviderPort | None = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._passwords = passwords
         self._access_tokens = access_tokens
         self._refresh_tokens = refresh_tokens
         self._refresh_ttl = timedelta(days=refresh_ttl_days)
+        self._identity_provider = identity_provider
 
     async def register(self, email: str, display_name: str, password: str) -> AuthResult:
         normalized_email = self._normalize_email(email)
@@ -97,6 +100,60 @@ class AuthService:
             user.last_login_at = utc_now()
             user.updated_at = utc_now()
             await uow.users.save(user)
+            organizations = await uow.organizations.list_for_user(user.id)
+            result = await self._create_session(
+                uow,
+                user,
+                organizations[0] if organizations else None,
+            )
+            await uow.commit()
+            return result
+
+    async def login_with_google(self, id_token: str) -> AuthResult:
+        if self._identity_provider is None:
+            raise ValueError("Identity provider is not configured")
+
+        payload = await self._identity_provider.verify_id_token(id_token)
+        email = payload["email"]
+        display_name = payload["name"]
+
+        normalized_email = self._normalize_email(email)
+
+        async with self._uow_factory() as uow:
+            user = await uow.users.get_by_email(normalized_email)
+            if user is None:
+                # Register a user without password for Google auth
+                import secrets
+
+                random_pwd = secrets.token_urlsafe(32)
+                user = User(
+                    email=normalized_email,
+                    display_name=display_name,
+                    password_hash=await self._passwords.hash(random_pwd),
+                )
+                organization = Organization(
+                    name=f"{display_name}'s Workspace",
+                    slug=f"personal-{user.id.hex}",
+                    type=OrganizationType.PERSONAL,
+                )
+                await uow.users.add(user)
+                await uow.organizations.add(organization)
+                await uow.flush()
+                await uow.organizations.add_membership(
+                    OrganizationMembership(
+                        organization_id=organization.id,
+                        user_id=user.id,
+                        role=MembershipRole.OWNER,
+                    )
+                )
+            else:
+                if user.status is not UserStatus.ACTIVE:
+                    raise AuthenticationError("User is disabled", "user_disabled")
+
+            user.last_login_at = utc_now()
+            user.updated_at = utc_now()
+            await uow.users.save(user)
+
             organizations = await uow.organizations.list_for_user(user.id)
             result = await self._create_session(
                 uow,

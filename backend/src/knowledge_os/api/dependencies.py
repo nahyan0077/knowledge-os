@@ -31,12 +31,15 @@ def get_uow() -> UnitOfWork:
 
 
 def get_auth_service(settings: Annotated[Settings, Depends(get_settings)]) -> AuthService:
+    from knowledge_os.infrastructure.security.oauth import GoogleIdentityProvider
+
     return AuthService(
         uow_factory=get_uow,
         passwords=Argon2PasswordService(),
         access_tokens=JwtAccessTokenService(settings),
         refresh_tokens=OpaqueRefreshTokenService(),
         refresh_ttl_days=settings.refresh_token_ttl_days,
+        identity_provider=GoogleIdentityProvider(settings),
     )
 
 

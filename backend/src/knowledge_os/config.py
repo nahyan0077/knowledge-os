@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     storage_provider: str = "azure_blob"  # "azure_blob", "google_gcs", or "local"
     google_application_credentials: str | None = None
     gcs_bucket_name: str = "documents"
+    google_client_id: str | None = None
 
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "default"

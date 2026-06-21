@@ -5,7 +5,7 @@ UV ?= uv
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup install env migrate migration-sql run test lint format format-check typecheck check clean services-up services-down frontend-install frontend worker qdrant-ui temporal-ui
+.PHONY: help setup install env migrate migration-sql run run-debug test lint format format-check typecheck check clean services-up services-down frontend-install frontend worker qdrant-ui temporal-ui
 
 help: ## Show available commands
 	@awk 'BEGIN {FS = ":.*## "; print "Knowledge OS commands:"} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -26,6 +26,9 @@ migration-sql: ## Validate migrations by generating PostgreSQL SQL
 
 run: ## Run the FastAPI development server
 	cd $(BACKEND_DIR) && $(UV) run uvicorn knowledge_os.main:app --reload
+
+run-debug: ## Run the FastAPI development server with debug logs
+	cd $(BACKEND_DIR) && $(UV) run uvicorn knowledge_os.main:app --reload --log-level debug
 
 test: ## Run tests
 	cd $(BACKEND_DIR) && $(UV) run pytest -q
