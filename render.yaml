@@ -67,3 +67,10 @@ services:
       
       - key: KNOWLEDGE_OS_TEMPORAL_HOST
         value: "localhost:7233" # In production, set to your Temporal Cloud or self-hosted Temporal instance
+      
+      - key: KNOWLEDGE_OS_TEMPORAL_NAMESPACE
+        value: "default"
+      
+      - key: KNOWLEDGE_OS_TEMPORAL_API_KEY
+        sync: false
+        placeholder: "Your Temporal Cloud API key (if using Temporal Cloud)"
