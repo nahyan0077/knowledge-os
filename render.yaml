@@ -26,7 +26,29 @@ services:
         value: "true"
       
       - key: KNOWLEDGE_OS_STORAGE_PROVIDER
-        value: "local"  # "local", "azure_blob", or "google_gcs"
+        value: "local"  # "local", "azure_blob", or "supabase"
+      
+      - key: KNOWLEDGE_OS_SUPABASE_URL
+        sync: false
+        placeholder: "https://your-project.supabase.co"
+      
+      - key: KNOWLEDGE_OS_SUPABASE_S3_ENDPOINT
+        sync: false
+        placeholder: "https://your-project.storage.supabase.co/storage/v1/s3"
+      
+      - key: KNOWLEDGE_OS_SUPABASE_REGION
+        value: "us-east-1"
+      
+      - key: KNOWLEDGE_OS_SUPABASE_KEY
+        sync: false
+        placeholder: "Your S3 access key ID from Supabase Storage Settings"
+      
+      - key: KNOWLEDGE_OS_SUPABASE_SECRET_KEY
+        sync: false
+        placeholder: "Your S3 secret access key from Supabase Storage Settings"
+      
+      - key: KNOWLEDGE_OS_SUPABASE_STORAGE_BUCKET
+        value: "documents"
       
       - key: KNOWLEDGE_OS_EMBEDDING_PROVIDER
         value: "gemini" # "gemini" or "openai"

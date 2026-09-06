@@ -1,7 +1,7 @@
 from knowledge_os.application.ports import BlobStoragePort
 from knowledge_os.config import Settings
 from knowledge_os.infrastructure.storage.azure import AzureBlobStorageAdapter
-from knowledge_os.infrastructure.storage.gcs import GcsStorageAdapter
+from knowledge_os.infrastructure.storage.supabase import SupabaseStorageAdapter
 
 
 class StorageFactory:
@@ -10,8 +10,8 @@ class StorageFactory:
         prov = (provider or settings.storage_provider).lower()
         if prov == "azure_blob":
             return AzureBlobStorageAdapter(settings)
-        elif prov in {"google_gcs", "gcs"}:
-            return GcsStorageAdapter(settings)
+        elif prov == "supabase":
+            return SupabaseStorageAdapter(settings)
         elif prov == "local":
             return AzureBlobStorageAdapter(settings)
         else:

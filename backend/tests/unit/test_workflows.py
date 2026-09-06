@@ -101,7 +101,7 @@ async def test_document_processing_workflow_success(monkeypatch: pytest.MonkeyPa
     from knowledge_os.config import get_settings
     from knowledge_os.infrastructure.storage.factory import StorageFactory
 
-    storage = StorageFactory.get_storage(get_settings())
+    storage = StorageFactory.get_storage(get_settings(), provider="local")
     await storage.upload(
         "test_blob",
         (

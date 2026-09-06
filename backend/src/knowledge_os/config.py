@@ -43,9 +43,13 @@ class Settings(BaseSettings):
     secure_cookies: bool = False
     azure_storage_connection_string: str | None = None
     azure_storage_container_name: str = "documents"
-    storage_provider: str = "azure_blob"  # "azure_blob", "google_gcs", or "local"
-    google_application_credentials: str | None = None
-    gcs_bucket_name: str = "documents"
+    storage_provider: str = "azure_blob"  # "azure_blob", "supabase", or "local"
+    supabase_url: str = "https://xpikrdscgqdfvmzaqeai.supabase.co"
+    supabase_s3_endpoint: str = "https://xpikrdscgqdfvmzaqeai.storage.supabase.co/storage/v1/s3"
+    supabase_region: str = "ap-southeast-2"
+    supabase_key: str = ""
+    supabase_secret_key: str = ""
+    supabase_storage_bucket: str = "documents"
     google_client_id: str | None = None
 
     temporal_host: str = "localhost:7233"

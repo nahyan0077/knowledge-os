@@ -105,9 +105,9 @@
 - **Chat Integration**: Updated chat workflow in `ConversationService` (`send_message` and `send_message_stream`) to fetch context and persist citations in `Message` metadata.
 - **Tests**: Implemented unit tests (ContextBuilder, RagService) and integration tests (RAG E2E, router routes, and tenant boundary verification). 68 total tests passing.
 - **Azure & Google Multi-Provider Support**:
-  - Implemented `GcsStorageAdapter` using GCS client SDK with async-safe thread-pool executions.
+  - Implemented `SupabaseStorageAdapter` using boto3 S3-compatible API with async-safe thread-pool executions.
   - Implemented `GeminiEmbeddingProvider` wrapping Google's generative language embedding REST API async-natively.
-  - Created `StorageFactory` and `EmbeddingProviderFactory` to dynamically resolve between Azure and Google Cloud services at runtime based on configuration or version metadata.
+  - Created `StorageFactory` and `EmbeddingProviderFactory` to dynamically resolve between Azure and Supabase services at runtime based on configuration or version metadata.
   - Wired factories into FastAPI endpoint dependencies and Temporal workflow activities.
 
 ## Technical Debt & Risks
