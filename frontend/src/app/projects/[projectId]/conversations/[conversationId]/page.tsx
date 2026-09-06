@@ -440,11 +440,11 @@ export default function ChatWorkspacePage() {
           </div>
         ) : (
           <div className="space-y-6 max-w-4xl mx-auto">
-            {messages
-              .filter((msg) => msg.status !== 'STREAMING')
-              .map((msg) => {
+            {messages.map((msg) => {
               const isUser = msg.role === 'user';
-              
+              const isStreamingMsg = !isUser && msg.status === 'STREAMING';
+              const isLatestStreaming = isStreamingMsg && isStreaming && msg.id === messages[messages.length - 1]?.id;
+
               return (
                 <div
                   key={msg.id}
@@ -465,9 +465,26 @@ export default function ChatWorkspacePage() {
                           : 'bg-zinc-900/40 border border-zinc-900 text-zinc-200 rounded-tl-none'
                       }`}
                     >
-                      {renderContentWithCitations(msg.content, msg.metadata?.citations)}
+                      {isLatestStreaming && !streamContent ? (
+                        <div className="flex gap-1 py-1">
+                          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"></span>
+                          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                          <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                        </div>
+                      ) : isLatestStreaming && streamContent ? (
+                        <p className="whitespace-pre-wrap">{streamContent}</p>
+                      ) : (
+                        renderContentWithCitations(msg.content, msg.metadata?.citations)
+                      )}
 
-                      {!isUser && msg.metadata?.citations && msg.metadata.citations.length > 0 && (
+                      {streamError && isLatestStreaming && (
+                        <div className="mt-3 flex items-center gap-2 text-xs text-red-400 p-2 rounded-lg bg-red-950/20 border border-red-950/50">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          <span>{streamError}</span>
+                        </div>
+                      )}
+
+                      {!isUser && msg.metadata?.citations && msg.metadata.citations.length > 0 && !isLatestStreaming && (
                         <div className="mt-3 flex flex-wrap gap-2 border-t border-zinc-800/80 pt-3">
                           {msg.metadata.citations.map((citation, index) => (
                             <button
@@ -486,8 +503,7 @@ export default function ChatWorkspacePage() {
                         </div>
                       )}
 
-                      {/* Display warning/retry for failed message */}
-                      {!isUser && msg.status === 'FAILED' && (
+                      {!isUser && msg.status === 'FAILED' && !isLatestStreaming && (
                         <div className="mt-3 flex items-center gap-2 text-xs text-red-400 p-2 rounded-lg bg-red-950/20 border border-red-950/50">
                           <AlertCircle className="h-4 w-4 shrink-0" />
                           <span>Generation failed.</span>
@@ -501,8 +517,7 @@ export default function ChatWorkspacePage() {
                         </div>
                       )}
 
-                      {/* Display warning for interrupted message */}
-                      {!isUser && msg.status === 'INTERRUPTED' && (
+                      {!isUser && msg.status === 'INTERRUPTED' && !isLatestStreaming && (
                         <div className="mt-3 flex items-center gap-2 text-xs text-zinc-400 p-2 rounded-lg bg-zinc-950 border border-zinc-850">
                           <AlertCircle className="h-4 w-4 text-zinc-500 shrink-0" />
                           <span>Generation interrupted by user.</span>
@@ -514,6 +529,22 @@ export default function ChatWorkspacePage() {
                     <div className="mt-1.5 flex items-center gap-2.5 text-[10px] text-zinc-500 pl-1">
                       {isUser ? (
                         <span>User</span>
+                      ) : isLatestStreaming ? (
+                        <>
+                          <span className="font-extrabold text-indigo-400 uppercase tracking-widest animate-pulse">STREAMING</span>
+                          {streamUsage && (
+                            <div className="flex items-center gap-2 text-[9px] text-zinc-550 font-medium">
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="h-3 w-3" />
+                                {streamUsage.latency_ms}ms
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <Coins className="h-3 w-3" />
+                                ${(streamUsage.cost * 1000).toFixed(4)}k
+                              </span>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <>
                           <span className="font-semibold text-zinc-500 uppercase tracking-wider">{msg.status}</span>
@@ -546,54 +577,8 @@ export default function ChatWorkspacePage() {
               );
             })}
 
-            {/* Streaming Message Indicator */}
-            {isStreaming && (
-              <div className="flex gap-4 justify-start">
-                <div className="h-8 w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-indigo-400 shrink-0 shadow-md">
-                  <Bot className="h-4 w-4" />
-                </div>
-
-                <div className="flex flex-col max-w-[80%] items-start">
-                  <div className="p-4 rounded-2xl text-sm leading-relaxed bg-zinc-900/40 border border-zinc-900 text-zinc-200 rounded-tl-none">
-                    {streamContent ? (
-                      <p className="whitespace-pre-wrap">{streamContent}</p>
-                    ) : (
-                      <div className="flex gap-1 py-1">
-                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"></span>
-                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                      </div>
-                    )}
-
-                    {streamError && (
-                      <div className="mt-3 flex items-center gap-2 text-xs text-red-400 p-2 rounded-lg bg-red-950/20 border border-red-950/50">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
-                        <span>{streamError}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="mt-1.5 flex items-center gap-2.5 text-[10px] text-zinc-550 pl-1">
-                    <span className="font-extrabold text-indigo-400 uppercase tracking-widest animate-pulse">STREAMING</span>
-                    {streamUsage && (
-                      <div className="flex items-center gap-2 text-[9px] font-medium">
-                        <span className="flex items-center gap-0.5">
-                          <Clock className="h-3 w-3" />
-                          {streamUsage.latency_ms}ms
-                        </span>
-                        <span className="flex items-center gap-0.5">
-                          <Coins className="h-3 w-3" />
-                          ${(streamUsage.cost * 1000).toFixed(4)}k
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Persistent Stream Error Display */}
-            {!isStreaming && streamError && (
+            {/* Persistent Stream Error Display (when not streaming) */}
+            {!isStreaming && streamError && !messages.some((m) => m.status === 'STREAMING') && (
               <div className="flex gap-4 justify-start max-w-4xl mx-auto">
                 <div className="h-8 w-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-red-400 shrink-0 shadow-md">
                   <AlertCircle className="h-4 w-4" />
