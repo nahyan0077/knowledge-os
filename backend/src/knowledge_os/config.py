@@ -33,6 +33,14 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
     ]
+
+    @field_validator("cors_origins")
+    @classmethod
+    def validate_cors_origins(cls, v: list[str]) -> list[str]:
+        if "*" in v and len(v) > 1:
+            raise ValueError("CORS wildcard '*' cannot be combined with specific origins")
+        return v
+
     jwt_secret: str = Field(
         default="development-only-secret-change-before-deploy",
         min_length=32,
@@ -61,6 +69,11 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     gemini_api_key: str | None = None
     embedding_provider: str = "openai"  # "openai" or "gemini"
+
+    # Rate limiting (requests per minute)
+    rate_limit_auth: int = 10
+    rate_limit_api: int = 60
+    rate_limit_chat: int = 30
 
     model_pricing: dict[str, dict[str, float]] = {
         "gpt-4o-mini": {"input_rate_per_million": 0.150, "output_rate_per_million": 0.600},
