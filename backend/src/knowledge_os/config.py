@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "default"
     temporal_api_key: str | None = None
+
+    processing_mode: str = "temporal"  # "temporal" or "sync"
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str | None = None
     qdrant_timeout: int = 10

@@ -74,3 +74,6 @@ services:
       - key: KNOWLEDGE_OS_TEMPORAL_API_KEY
         sync: false
         placeholder: "Your Temporal Cloud API key (if using Temporal Cloud)"
+      
+      - key: KNOWLEDGE_OS_PROCESSING_MODE
+        value: "temporal" # "temporal" or "sync" (sync requires no Temporal/worker)

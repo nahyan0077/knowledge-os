@@ -255,10 +255,11 @@ class DocumentService:
     ) -> None:
         import logging
 
+        from knowledge_os.config import get_settings
         from knowledge_os.domain.entities import WorkflowRun, WorkflowRunStatus
-        from knowledge_os.infrastructure.workflows.client import get_temporal_client
 
         logger = logging.getLogger(__name__)
+        settings = get_settings()
         workflow_id = f"doc-processing-{version_id}"
         run_id = uuid4()
 
@@ -275,29 +276,49 @@ class DocumentService:
             await uow.workflow_runs.add(run)
             await uow.commit()
 
-        try:
-            client = await get_temporal_client()
-            payload = {
-                "organization_id": str(organization_id),
-                "project_id": str(project_id),
-                "document_id": str(document_id),
-                "version_id": str(version_id),
-                "user_id": str(user_id),
-                "workflow_run_id": str(run_id),
-            }
-            await client.start_workflow(
-                "DocumentProcessingWorkflow",
-                payload,
-                id=workflow_id,
-                task_queue="document-processing",
-            )
-        except Exception as exc:
-            logger.error(f"Failed to start Temporal workflow for document {document_id}: {exc}")
-            async with self._uow_factory() as uow:
-                existing_run = await uow.workflow_runs.get_by_id(run_id)
-                if existing_run:
-                    existing_run.status = WorkflowRunStatus.FAILED
-                    existing_run.completed_at = utc_now()
-                    existing_run.error_message = f"Temporal start failure: {exc}"
-                    await uow.workflow_runs.save(existing_run)
-                await uow.commit()
+        payload = {
+            "organization_id": str(organization_id),
+            "project_id": str(project_id),
+            "document_id": str(document_id),
+            "version_id": str(version_id),
+            "user_id": str(user_id),
+            "workflow_run_id": str(run_id),
+        }
+
+        if settings.processing_mode == "sync":
+            from knowledge_os.application.sync_processor import process_document_sync
+
+            logger.info(f"Processing document {document_id} in sync mode")
+            try:
+                await process_document_sync(payload)
+            except Exception as exc:
+                logger.error(f"Sync processing failed for document {document_id}: {exc}")
+                async with self._uow_factory() as uow:
+                    existing_run = await uow.workflow_runs.get_by_id(run_id)
+                    if existing_run:
+                        existing_run.status = WorkflowRunStatus.FAILED
+                        existing_run.completed_at = utc_now()
+                        existing_run.error_message = f"Sync processing failure: {exc}"
+                        await uow.workflow_runs.save(existing_run)
+                    await uow.commit()
+        else:
+            from knowledge_os.infrastructure.workflows.client import get_temporal_client
+
+            try:
+                client = await get_temporal_client()
+                await client.start_workflow(
+                    "DocumentProcessingWorkflow",
+                    payload,
+                    id=workflow_id,
+                    task_queue="document-processing",
+                )
+            except Exception as exc:
+                logger.error(f"Failed to start Temporal workflow for document {document_id}: {exc}")
+                async with self._uow_factory() as uow:
+                    existing_run = await uow.workflow_runs.get_by_id(run_id)
+                    if existing_run:
+                        existing_run.status = WorkflowRunStatus.FAILED
+                        existing_run.completed_at = utc_now()
+                        existing_run.error_message = f"Temporal start failure: {exc}"
+                        await uow.workflow_runs.save(existing_run)
+                    await uow.commit()
