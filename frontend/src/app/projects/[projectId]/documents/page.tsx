@@ -19,6 +19,8 @@ import {
   Layers,
   CheckCircle,
   Eye,
+  Loader2,
+  XCircle,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -163,6 +165,21 @@ export default function DocumentExplorerPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'processing':
+        return { icon: Loader2, text: 'Processing', className: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20', animate: true };
+      case 'indexed':
+        return { icon: CheckCircle, text: 'Indexed', className: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', animate: false };
+      case 'uploaded':
+        return { icon: Loader2, text: 'Uploading', className: 'text-blue-400 bg-blue-500/10 border-blue-500/20', animate: true };
+      case 'failed':
+        return { icon: XCircle, text: 'Failed', className: 'text-red-400 bg-red-500/10 border-red-500/20', animate: false };
+      default:
+        return { icon: AlertTriangle, text: 'Unknown', className: 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20', animate: false };
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col p-6 min-h-0 relative">
       <div className="flex flex-col gap-6 lg:flex-row flex-1 min-h-0">
@@ -205,7 +222,10 @@ export default function DocumentExplorerPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {data.items.map((doc) => (
+                {data.items.map((doc) => {
+                  const badge = getStatusBadge(doc.current_version_status);
+                  const BadgeIcon = badge.icon;
+                  return (
                   <div
                     key={doc.id}
                     className="group flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-900 hover:border-zinc-850 transition-all gap-4"
@@ -215,9 +235,15 @@ export default function DocumentExplorerPage() {
                         <FileText className="h-4.5 w-4.5" />
                       </div>
                       <div className="truncate text-left pl-1">
-                        <h4 className="text-sm font-semibold text-zinc-200 truncate group-hover:text-indigo-400 transition-colors">
-                          {doc.name}
-                        </h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold text-zinc-200 truncate group-hover:text-indigo-400 transition-colors">
+                            {doc.name}
+                          </h4>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${badge.className}`}>
+                            <BadgeIcon className={`h-3 w-3 ${badge.animate ? 'animate-spin' : ''}`} />
+                            {badge.text}
+                          </span>
+                        </div>
                         <p className="text-[10px] text-zinc-500 mt-0.5">
                           Added {new Date(doc.created_at).toLocaleDateString()} at {new Date(doc.created_at).toLocaleTimeString()}
                         </p>
@@ -246,7 +272,8 @@ export default function DocumentExplorerPage() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

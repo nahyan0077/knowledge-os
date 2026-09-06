@@ -114,18 +114,22 @@ class DocumentResponse(BaseModel):
     project_id: UUID
     name: str
     current_version_id: UUID | None
+    current_version_status: str | None = None
     created_by: UUID
     created_at: datetime
     updated_at: datetime
 
     @classmethod
-    def from_domain(cls, doc: Document) -> "DocumentResponse":
+    def from_domain(
+        cls, doc: Document, current_version_status: str | None = None
+    ) -> "DocumentResponse":
         return cls(
             id=doc.id,
             organization_id=doc.organization_id,
             project_id=doc.project_id,
             name=doc.name,
             current_version_id=doc.current_version_id,
+            current_version_status=current_version_status,
             created_by=doc.created_by,
             created_at=doc.created_at,
             updated_at=doc.updated_at,
@@ -211,6 +215,10 @@ class MessageAddRequest(BaseModel):
     role: str = Field(min_length=1, max_length=50)
     content: str = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class MessageFeedbackRequest(BaseModel):
+    rating: str = Field(pattern=r"^(up|down)$")
 
 
 class MessageResponse(BaseModel):

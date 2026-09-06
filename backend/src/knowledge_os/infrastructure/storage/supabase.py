@@ -1,8 +1,8 @@
 import asyncio
 from typing import cast
 
-import boto3  # type: ignore[import-untyped]
-from botocore.config import Config  # type: ignore[import-untyped]
+import boto3
+from botocore.config import Config
 
 from knowledge_os.application.ports import BlobStoragePort
 from knowledge_os.config import Settings

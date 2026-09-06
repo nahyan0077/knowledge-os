@@ -19,6 +19,8 @@ import {
   StopCircle,
   CornerDownLeft,
   BookOpen,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 
 interface ModelOption {
@@ -49,6 +51,7 @@ export default function ChatWorkspacePage() {
   const [temperature, setTemperature] = useState<number>(0.7);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, 'up' | 'down' | null>>({});
 
   // Render a single text segment with inline bold and citation badges
   const renderSegment = (text: string, citations: Citation[], keyPrefix: string): React.ReactNode[] => {
@@ -180,6 +183,21 @@ export default function ChatWorkspacePage() {
   });
 
   const messages = historyData?.items || [];
+
+  // Initialize feedback map from message metadata
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      setFeedbackMap((prev) => {
+        const updated = { ...prev };
+        messages.forEach((msg) => {
+          if (msg.metadata?.feedback && !(msg.id in updated)) {
+            updated[msg.id] = msg.metadata.feedback as 'up' | 'down';
+          }
+        });
+        return updated;
+      });
+    }
+  }, [messages]);
 
   function conversationKey(id: string) {
     return id;
@@ -356,6 +374,28 @@ export default function ChatWorkspacePage() {
     }
   };
 
+  const handleFeedback = async (messageId: string, feedback: 'up' | 'down') => {
+    const currentFeedback = feedbackMap[messageId];
+    const newFeedback = currentFeedback === feedback ? null : feedback;
+
+    setFeedbackMap((prev) => ({
+      ...prev,
+      [messageId]: newFeedback,
+    }));
+
+    // Persist feedback to backend (fire and forget)
+    if (newFeedback) {
+      try {
+        await apiClient(`/messages/${messageId}/feedback`, {
+          method: 'POST',
+          body: JSON.stringify({ rating: newFeedback }),
+        });
+      } catch {
+        // Silently ignore — feedback is non-critical
+      }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -500,6 +540,33 @@ export default function ChatWorkspacePage() {
                               {citation.page_start ? ` · p. ${citation.page_start}` : ''}
                             </button>
                           ))}
+                        </div>
+                      )}
+
+                      {!isUser && !isLatestStreaming && msg.status === 'COMPLETE' && (
+                        <div className="mt-3 pt-2 border-t border-zinc-800/50 flex items-center gap-1">
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'up')}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              feedbackMap[msg.id] === 'up'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent'
+                            }`}
+                            title="Helpful"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(msg.id, 'down')}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              feedbackMap[msg.id] === 'down'
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 border border-transparent'
+                            }`}
+                            title="Not helpful"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       )}
 

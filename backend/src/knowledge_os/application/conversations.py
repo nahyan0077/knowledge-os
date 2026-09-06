@@ -185,6 +185,21 @@ class ConversationService:
 
             return await uow.conversations.list_messages(conversation_id, user_id)
 
+    async def set_message_feedback(
+        self, message_id: UUID, user_id: UUID, rating: str
+    ) -> Message:
+        async with self._uow_factory() as uow:
+            message = await uow.conversations.get_message_by_id(message_id, user_id)
+            if message is None:
+                raise NotFoundError("Message not found", "message_not_found")
+
+            message.metadata["feedback"] = rating
+
+            await uow.conversations.save_message(message)
+            await uow.commit()
+
+            return message
+
     async def send_message(
         self,
         conversation_id: UUID,

@@ -71,13 +71,16 @@ async def list_documents(
     service: Annotated[DocumentService, Depends(get_document_service)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> DocumentListResponse:
-    documents = await service.list(
+    documents, version_statuses = await service.list(
         organization_id=organization_id,
         project_id=project_id,
         user_id=user_id,
         limit=limit,
     )
-    return DocumentListResponse(items=[DocumentResponse.from_domain(doc) for doc in documents])
+    return DocumentListResponse(items=[
+        DocumentResponse.from_domain(doc, version_statuses.get(doc.id))
+        for doc in documents
+    ])
 
 
 @router.get("/documents/{document_id}", response_model=DocumentResponse)

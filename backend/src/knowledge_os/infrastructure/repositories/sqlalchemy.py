@@ -667,6 +667,24 @@ class SqlAlchemyConversationRepository:
         ).all()
         return [to_message(row) for row in rows]
 
+    async def get_message_by_id(self, message_id: UUID, user_id: UUID) -> Message | None:
+        row = (
+            await self.session.scalars(
+                select(MessageModel)
+                .join(ConversationModel, ConversationModel.id == MessageModel.conversation_id)
+                .join(
+                    ProjectMemberModel,
+                    ProjectMemberModel.project_id == ConversationModel.project_id,
+                )
+                .where(
+                    MessageModel.id == message_id,
+                    ProjectMemberModel.user_id == user_id,
+                    ConversationModel.deleted_at.is_(None),
+                )
+            )
+        ).first()
+        return to_message(row) if row else None
+
 
 def to_llm_usage(row: LlmUsageModel) -> LlmUsage:
     return LlmUsage(

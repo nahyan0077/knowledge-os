@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, useUiStore } from '@/shared/lib/store';
 import { apiClient } from '@/shared/api/client';
-import { Project, ProjectListResponse } from '@/shared/types';
+import { Project, ProjectListResponse, DocumentListResponse, ConversationListResponse } from '@/shared/types';
 import { useRouter } from 'next/navigation';
 import { Plus, LogOut, Folder, FileText, MessageSquare, Settings as SettingsIcon, Calendar, ArrowRight, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -37,6 +37,54 @@ export default function DashboardPage() {
       params: { organization_id: organization?.id },
     }),
     enabled: !!organization?.id,
+  });
+
+  // Fetch stats for each project
+  const projects = data?.items || [];
+  const projectIds = projects.map((p) => p.id);
+
+  // Fetch document counts for all projects
+  const { data: docStats } = useQuery<Record<string, number>>({
+    queryKey: ['project-doc-stats', organization?.id],
+    queryFn: async () => {
+      const stats: Record<string, number> = {};
+      await Promise.all(
+        projectIds.map(async (id) => {
+          try {
+            const res = await apiClient<DocumentListResponse>(`/projects/${id}/documents`, {
+              params: { organization_id: organization?.id },
+            });
+            stats[id] = res.items.length;
+          } catch {
+            stats[id] = 0;
+          }
+        })
+      );
+      return stats;
+    },
+    enabled: projectIds.length > 0 && !!organization?.id,
+  });
+
+  // Fetch conversation counts for all projects
+  const { data: convStats } = useQuery<Record<string, number>>({
+    queryKey: ['project-conv-stats', organization?.id],
+    queryFn: async () => {
+      const stats: Record<string, number> = {};
+      await Promise.all(
+        projectIds.map(async (id) => {
+          try {
+            const res = await apiClient<ConversationListResponse>(`/projects/${id}/conversations`, {
+              params: { organization_id: organization?.id },
+            });
+            stats[id] = res.items.length;
+          } catch {
+            stats[id] = 0;
+          }
+        })
+      );
+      return stats;
+    },
+    enabled: projectIds.length > 0 && !!organization?.id,
   });
 
   const createMutation = useMutation({
@@ -158,37 +206,107 @@ export default function DashboardPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {data.items.map((project) => (
-              <div
-                key={project.id}
-                onClick={() => handleProjectSelect(project)}
-                className="group relative flex flex-col justify-between p-6 rounded-2xl bg-zinc-900/40 hover:bg-zinc-900/80 border border-zinc-900 hover:border-zinc-800/80 transition-all duration-300 shadow-lg cursor-pointer overflow-hidden hover:-translate-y-0.5"
-              >
-                {/* Glow border on hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                
-                <div>
-                  <div className="h-10 w-10 rounded-xl bg-zinc-950 border border-zinc-800/80 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform duration-300">
-                    <Folder className="h-5 w-5 text-indigo-400" />
+          <>
+            {/* Stats Summary */}
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-900">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                    <Folder className="h-4 w-4 text-indigo-400" />
                   </div>
-                  <h3 className="text-lg font-bold text-white group-hover:text-indigo-400 transition-colors line-clamp-1">{project.name}</h3>
-                  <p className="text-zinc-400 text-xs mt-2 line-clamp-3 leading-relaxed min-h-[4rem]">{project.description || 'No description provided.'}</p>
-                </div>
-
-                <div className="border-t border-zinc-900/80 mt-6 pt-4 flex items-center justify-between text-zinc-500 text-xs">
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span>{new Date(project.created_at).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1 font-semibold text-indigo-400 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                    <span>Enter</span>
-                    <ArrowRight className="h-3 w-3" />
+                  <div>
+                    <p className="text-2xl font-bold text-white">{projects.length}</p>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Projects</p>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-900">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">
+                      {docStats ? Object.values(docStats).reduce((a, b) => a + b, 0) : '—'}
+                    </p>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Documents</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-900">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <MessageSquare className="h-4 w-4 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">
+                      {convStats ? Object.values(convStats).reduce((a, b) => a + b, 0) : '—'}
+                    </p>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Conversations</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Projects List */}
+            <div className="border border-zinc-900 rounded-2xl bg-zinc-900/20 overflow-hidden">
+              {/* List Header */}
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-zinc-900 bg-zinc-900/40 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                <div className="col-span-4">Project</div>
+                <div className="col-span-3 hidden sm:block">Description</div>
+                <div className="col-span-2 text-center">Docs</div>
+                <div className="col-span-2 text-center">Chats</div>
+                <div className="col-span-1 text-right">Opened</div>
+              </div>
+
+              {/* List Rows */}
+              {data.items.map((project) => (
+                <div
+                  key={project.id}
+                  onClick={() => handleProjectSelect(project)}
+                  className="group grid grid-cols-12 gap-4 items-center px-6 py-4 border-b border-zinc-900/50 last:border-b-0 hover:bg-zinc-900/40 transition-colors cursor-pointer"
+                >
+                  {/* Project Name */}
+                  <div className="col-span-4 flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center shrink-0 group-hover:border-indigo-500/30 transition-colors">
+                      <Folder className="h-4 w-4 text-indigo-400" />
+                    </div>
+                    <span className="text-sm font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors truncate">
+                      {project.name}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  <div className="col-span-3 hidden sm:block">
+                    <p className="text-xs text-zinc-500 truncate">{project.description || '—'}</p>
+                  </div>
+
+                  {/* Doc Count */}
+                  <div className="col-span-2 flex items-center justify-center">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+                      <FileText className="h-3.5 w-3.5 text-emerald-400/60" />
+                      {docStats?.[project.id] ?? 0}
+                    </span>
+                  </div>
+
+                  {/* Chat Count */}
+                  <div className="col-span-2 flex items-center justify-center">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+                      <MessageSquare className="h-3.5 w-3.5 text-purple-400/60" />
+                      {convStats?.[project.id] ?? 0}
+                    </span>
+                  </div>
+
+                  {/* Created Date */}
+                  <div className="col-span-1 flex items-center justify-end">
+                    <span className="text-[11px] text-zinc-500">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </main>
 

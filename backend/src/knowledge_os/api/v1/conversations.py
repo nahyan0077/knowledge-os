@@ -16,6 +16,7 @@ from knowledge_os.api.schemas import (
     ConversationResponse,
     LlmUsageResponse,
     MessageAddRequest,
+    MessageFeedbackRequest,
     MessageListResponse,
     MessageResponse,
 )
@@ -125,6 +126,21 @@ async def list_messages(
 ) -> MessageListResponse:
     messages = await service.list_messages(conversation_id, user_id)
     return MessageListResponse(items=[MessageResponse.from_domain(m) for m in messages])
+
+
+@router.post(
+    "/messages/{message_id}/feedback",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def set_message_feedback(
+    message_id: UUID,
+    req: MessageFeedbackRequest,
+    user_id: Annotated[UUID, Depends(get_current_user_id)],
+    service: Annotated[ConversationService, Depends(get_conversation_service)],
+) -> MessageResponse:
+    message = await service.set_message_feedback(message_id, user_id, req.rating)
+    return MessageResponse.from_domain(message)
 
 
 @router.post(

@@ -166,14 +166,23 @@ class DocumentService:
         project_id: UUID,
         user_id: UUID,
         limit: int = 50,
-    ) -> Sequence[Document]:
+    ) -> tuple[Sequence[Document], dict[UUID, str]]:
         async with self._uow_factory() as uow:
             project_role = await uow.projects.user_role(project_id, user_id)
             if project_role is None:
                 raise AuthorizationError("Access denied", "project_access_denied")
-            return await uow.documents.list_for_project(
+            documents = await uow.documents.list_for_project(
                 organization_id, project_id, user_id, min(limit, 100)
             )
+
+            version_statuses: dict[UUID, str] = {}
+            for doc in documents:
+                if doc.current_version_id:
+                    version = await uow.documents.get_version_by_id(doc.current_version_id, user_id)
+                    if version:
+                        version_statuses[doc.id] = version.status.value
+
+            return documents, version_statuses
 
     async def get(self, document_id: UUID, user_id: UUID) -> Document:
         async with self._uow_factory() as uow:
