@@ -33,6 +33,17 @@ class QdrantVectorStore(VectorStorePort):
                         distance=rest_models.Distance.COSINE,
                     ),
                 )
+
+            # Ensure payload indexes exist for filtering
+            for field in ["document_version_id", "organization_id", "project_id"]:
+                try:
+                    self.client.create_payload_index(
+                        collection_name=collection_name,
+                        field_name=field,
+                        field_schema=rest_models.PayloadSchemaType.KEYWORD,
+                    )
+                except Exception:
+                    pass  # Index already exists
         except Exception as e:
             logger.error(f"Failed to create collection {collection_name}: {e}")
             raise e
